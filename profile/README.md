@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://play-lh.googleusercontent.com/hoRZ568WPBkAGlEZiBH2XjFjeojcZHIfoeV4k3k5FX2WECK26gRHDXp2O4Bf1s14A-OLjYwUBr0uLosYHqrPeAQ=w240-h480-rw" alt="KalimantanBio" width="180" height="180" />
+  <img src="https://avatars.githubusercontent.com/u/324422601?s=200&v=4" alt="KalimantanBio" width="180" height="180" />
 </p>
 
 <h1 align="center">KalimantanBio</h1>
@@ -245,24 +245,10 @@ GitHub is used for:
 
 <!-- ORG_MEMBERS_START -->
 
-| | |
-|---|---|
-| <a href="https://github.com/Alizah14"><img src="https://avatars.githubusercontent.com/u/233382592?v=4" width="50" height="50" style="border-radius: 50%;" /></a> | **[@Alizah14](https://github.com/Alizah14)** |
-| <a href="https://github.com/atechforce"><img src="https://avatars.githubusercontent.com/u/208674950?v=4" width="50" height="50" style="border-radius: 50%;" /></a> | **[@atechforce](https://github.com/atechforce)** |
-| <a href="https://github.com/Bieraaa"><img src="https://avatars.githubusercontent.com/u/202978180?v=4" width="50" height="50" style="border-radius: 50%;" /></a> | **[@Bieraaa](https://github.com/Bieraaa)** |
-| <a href="https://github.com/Jayennn"><img src="https://avatars.githubusercontent.com/u/108043334?v=4" width="50" height="50" style="border-radius: 50%;" /></a> | **[@Jayennn](https://github.com/Jayennn)** |
-| <a href="https://github.com/Kiana0130"><img src="https://avatars.githubusercontent.com/u/188063291?v=4" width="50" height="50" style="border-radius: 50%;" /></a> | **[@Kiana0130](https://github.com/Kiana0130)** |
-| <a href="https://github.com/nirvanaguys"><img src="https://avatars.githubusercontent.com/u/289380515?v=4" width="50" height="50" style="border-radius: 50%;" /></a> | **[@nirvanaguys](https://github.com/nirvanaguys)** |
-| <a href="https://github.com/NotHydra"><img src="https://avatars.githubusercontent.com/u/86897187?v=4" width="50" height="50" style="border-radius: 50%;" /></a> | **[@NotHydra](https://github.com/NotHydra)** |
-| <a href="https://github.com/peroyoo"><img src="https://avatars.githubusercontent.com/u/324713925?v=4" width="50" height="50" style="border-radius: 50%;" /></a> | **[@peroyoo](https://github.com/peroyoo)** |
-| <a href="https://github.com/sleepymor"><img src="https://avatars.githubusercontent.com/u/87416908?v=4" width="50" height="50" style="border-radius: 50%;" /></a> | **[@sleepymor](https://github.com/sleepymor)** |
-| <a href="https://github.com/Thisyath"><img src="https://avatars.githubusercontent.com/u/204345564?v=4" width="50" height="50" style="border-radius: 50%;" /></a> | **[@Thisyath](https://github.com/Thisyath)** |
+<table><tbody><tr><td align="center" width="25%"><a href="https://github.com/Alizah14"><img src="https://avatars.githubusercontent.com/u/233382592?v=4" width="60" height="60" style="border-radius: 50%;" /><br /><sub><b>@Alizah14</b></sub></a></td><td align="center" width="25%"><a href="https://github.com/atechforce"><img src="https://avatars.githubusercontent.com/u/208674950?v=4" width="60" height="60" style="border-radius: 50%;" /><br /><sub><b>@atechforce</b></sub></a></td><td align="center" width="25%"><a href="https://github.com/Bieraaa"><img src="https://avatars.githubusercontent.com/u/202978180?v=4" width="60" height="60" style="border-radius: 50%;" /><br /><sub><b>@Bieraaa</b></sub></a></td><td align="center" width="25%"><a href="https://github.com/Jayennn"><img src="https://avatars.githubusercontent.com/u/108043334?v=4" width="60" height="60" style="border-radius: 50%;" /><br /><sub><b>@Jayennn</b></sub></a></td></tr><tr><td align="center" width="25%"><a href="https://github.com/Kiana0130"><img src="https://avatars.githubusercontent.com/u/188063291?v=4" width="60" height="60" style="border-radius: 50%;" /><br /><sub><b>@Kiana0130</b></sub></a></td><td align="center" width="25%"><a href="https://github.com/nirvanaguys"><img src="https://avatars.githubusercontent.com/u/289380515?v=4" width="60" height="60" style="border-radius: 50%;" /><br /><sub><b>@nirvanaguys</b></sub></a></td><td align="center" width="25%"><a href="https://github.com/NotHydra"><img src="https://avatars.githubusercontent.com/u/86897187?v=4" width="60" height="60" style="border-radius: 50%;" /><br /><sub><b>@NotHydra</b></sub></a></td><td align="center" width="25%"><a href="https://github.com/peroyoo"><img src="https://avatars.githubusercontent.com/u/324713925?v=4" width="60" height="60" style="border-radius: 50%;" /><br /><sub><b>@peroyoo</b></sub></a></td></tr><tr><td align="center" width="25%"><a href="https://github.com/sleepymor"><img src="https://avatars.githubusercontent.com/u/87416908?v=4" width="60" height="60" style="border-radius: 50%;" /><br /><sub><b>@sleepymor</b></sub></a></td><td align="center" width="25%"><a href="https://github.com/Thisyath"><img src="https://avatars.githubusercontent.com/u/204345564?v=4" width="60" height="60" style="border-radius: 50%;" /><br /><sub><b>@Thisyath</b></sub></a></td><td></td><td></td></tr></tbody></table>
 
-
-*Last updated: 2026-09-05 12:29 UTC*
+*Last updated: 2026-09-05 12:37 UTC*
 <!-- ORG_MEMBERS_END -->
-
-*Last updated: $(date -u +"%Y-%m-%d %H:%M UTC")*
 
 ### Module Teams
 
@@ -276,7 +262,6 @@ Five teams developing concurrently across five independent modules:
 | Team 4 | ⚖️ Comparative Species Explorer | Multi-species comparison & similarity |
 | Team 5 | 📚 Biodiversity Knowledge & Citation Explorer | Scientific literature & citation exploration |
 
-> **Note:** Organization members are private. Team members contribute through their respective module repositories.
 
 ---
 
