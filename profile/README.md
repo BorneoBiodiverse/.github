@@ -216,6 +216,7 @@ Each repository contains its own:
 | **Existing Platform** | <https://kalimantanbio.com/repository/> |
 | **GitHub Organization** | <https://github.com/BorneoBiodiverse> |
 | **Project Management** | Trello (primary task management) |
+| **Getting Started Guide** | [GETTING_STARTED.md](../GETTING_STARTED.md) |
 
 ---
 
