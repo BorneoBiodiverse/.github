@@ -33,16 +33,37 @@ jobs:
         run: |
           README="profile/README.md"
           
-          # Build members markdown table
-          MEMBERS_MD="| | |\n|---|---|\n"
+          # Build 4-column HTML grid
+          MEMBERS_HTML=""
+          COL=0
           while IFS='|' read -r login avatar_url html_url; do
             [ -z "$login" ] && continue
-            MEMBERS_MD+="| <a href=\"$html_url\"><img src=\"$avatar_url\" width=\"50\" height=\"50\" style=\"border-radius: 50%;\" /></a> | **[@$login]($html_url)** |\n"
+            if [ $COL -eq 0 ]; then
+              MEMBERS_HTML+="<tr>"
+            fi
+            MEMBERS_HTML+="<td align=\"center\" width=\"25%\"><a href=\"$html_url\"><img src=\"$avatar_url\" width=\"60\" height=\"60\" style=\"border-radius: 50%;\" /><br /><sub><b>@$login</b></sub></a></td>"
+            COL=$((COL + 1))
+            if [ $COL -eq 4 ]; then
+              MEMBERS_HTML+="</tr>"
+              COL=0
+            fi
           done <<< "$MEMBERS"
           
-          if [ "$MEMBERS_MD" = "| | |\n|---|---|\n" ]; then
-            MEMBERS_MD="| | |\n|---|---|\n| No public members found | |\n"
+          # Close last row if needed
+          if [ $COL -gt 0 ]; then
+            # Fill remaining cells
+            while [ $COL -lt 4 ]; do
+              MEMBERS_HTML+="<td></td>"
+              COL=$((COL + 1))
+            done
+            MEMBERS_HTML+="</tr>"
           fi
+          
+          if [ -z "$MEMBERS_HTML" ]; then
+            MEMBERS_HTML="<tr><td colspan=\"4\" align=\"center\">No public members found</td></tr>"
+          fi
+          
+          MEMBERS_MD="<table><tbody>$MEMBERS_HTML</tbody></table>"
           
           # Add timestamp
           TIMESTAMP="*Last updated: $(date -u +"%Y-%m-%d %H:%M UTC")*"
