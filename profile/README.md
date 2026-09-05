@@ -231,6 +231,31 @@ GitHub is used for:
 
 ---
 
+## 👥 Team & Contributors
+
+### Project Leader
+
+| | |
+|---|---|
+| <a href="https://github.com/sleepymor"><img src="https://avatars.githubusercontent.com/u/87416908?v=4" width="80" height="80" style="border-radius: 50%;" /></a> | **[@sleepymor](https://github.com/sleepymor)** — Project Leader & Organization Owner |
+| | KalimantanBio: Biodiversity Knowledge Platform |
+
+### Module Teams
+
+Five teams developing concurrently across five independent modules:
+
+| Team | Module | Focus |
+|------|--------|-------|
+| Team 1 | 🔍 Intelligent Species Search | Natural-language species discovery & filtering |
+| Team 2 | 🕸️ Species Relationship Explorer | Species relationships & network exploration |
+| Team 3 | 🌳 Taxonomy & Classification Explorer | Taxonomic structure & classification |
+| Team 4 | ⚖️ Comparative Species Explorer | Multi-species comparison & similarity |
+| Team 5 | 📚 Biodiversity Knowledge & Citation Explorer | Scientific literature & citation exploration |
+
+> **Note:** Organization members are private. Team members contribute through their respective module repositories.
+
+---
+
 ## 🤝 Contributing
 
 Each module repository defines its own contribution guidelines. Please refer to the individual repository READMEs for setup, development workflow, and contribution processes.
