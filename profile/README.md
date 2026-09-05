@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://gusti-alfarisy.github.io/assets/theme/images/posts/kalimantanbio_repo.png" alt="KalimantanBio" width="180" height="180" />
+  <img src="https://play-lh.googleusercontent.com/hoRZ568WPBkAGlEZiBH2XjFjeojcZHIfoeV4k3k5FX2WECK26gRHDXp2O4Bf1s14A-OLjYwUBr0uLosYHqrPeAQ=w240-h480-rw" alt="KalimantanBio" width="180" height="180" />
 </p>
 
 <h1 align="center">KalimantanBio</h1>
@@ -283,7 +283,7 @@ Individual modules may have their own licenses. Check each repository for detail
 </p>
 
 <p align="center">
-  <img src="https://kalimantanbio.com/media/species/Alcedo_euryzona_accept.jpg" alt="Raja Udang Kalung-biru" width="200" />
+  <img src="https://kalimantanbio.com/media/species/Img_Raja_Udang_Kalung-biru_accept.jpg" alt="Raja Udang Kalung-biru" width="200" />
   <br />
   <em>Raja Udang Kalung-biru (Alcedo euryzona) — Critically Endangered</em>
 </p>
