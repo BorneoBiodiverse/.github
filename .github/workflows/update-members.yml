@@ -66,6 +66,8 @@ jobs:
           if ! git diff --quiet profile/README.md; then
             git add profile/README.md
             git commit -m "chore: update organization members [skip ci]"
+            # Pull with rebase to handle concurrent updates, then push
+            git pull --rebase origin main
             git push
           else
             echo "No changes to commit"
