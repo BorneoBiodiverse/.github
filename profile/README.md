@@ -249,8 +249,6 @@ GitHub is used for:
 *Last updated: 2026-09-05 12:37 UTC*
 <!-- ORG_MEMBERS_END -->
 
-*Last updated: $(date -u +"%Y-%m-%d %H:%M UTC")*
-
 ### Module Teams
 
 Five teams developing concurrently across five independent modules:
