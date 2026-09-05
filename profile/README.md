@@ -1,34 +1,73 @@
-# KalimantanBio
+<p align="center">
+  <img src="https://kalimantanbio.com/media/logo.png" alt="KalimantanBio" width="180" height="180" />
+</p>
 
-## Biodiversity Knowledge Platform
+<h1 align="center">KalimantanBio</h1>
 
-Discover the biodiversity of Kalimantan.  
-Explore species, relationships, taxonomy, comparisons, and scientific knowledge.
+<p align="center">
+  <strong>Biodiversity Knowledge Platform</strong>
+</p>
 
-> **One platform. Five independent modules.**
+<p align="center">
+  Discover the biodiversity of Kalimantan.<br />
+  Explore species, relationships, taxonomy, comparisons, and scientific knowledge.
+</p>
+
+<p align="center">
+  <strong>One platform. Five independent modules.</strong>
+</p>
+
+<p align="center">
+  <a href="https://kalimantanbio.com/repository/">
+    <img src="https://img.shields.io/badge/Existing%20Platform-kalimantanbio.com-238636?style=for-the-badge&logo=github" alt="Existing Platform" />
+  </a>
+  <a href="https://gusti-alfarisy.github.io/blog/2026/pbl-fp-2026/#kalimantanbio-biodiversity-knowledge-platform">
+    <img src="https://img.shields.io/badge/Project%20Spec-gusti--alfarisy.github.io-1f6feb?style=for-the-badge&logo=book" alt="Project Specification" />
+  </a>
+  <a href="https://github.com/BorneoBiodiverse">
+    <img src="https://img.shields.io/badge/Organization-BorneoBiodiverse-8b5cf6?style=for-the-badge&logo=github" alt="Organization" />
+  </a>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Rust-Axum-000000?style=flat-square&logo=rust&logoColor=white" alt="Axum" />
+  <img src="https://img.shields.io/badge/Python-Django-092E20?style=flat-square&logo=django&logoColor=white" alt="Django" />
+  <img src="https://img.shields.io/badge/Functional%20Programming-Principles-8b5cf6?style=flat-square&logo=lambda&logoColor=white" alt="Functional Programming" />
+  <img src="https://img.shields.io/badge/Architecture-Loosely%20Coupled-238636?style=flat-square" alt="Loosely Coupled" />
+  <img src="https://img.shields.io/badge/Development-Concurrent-f97583?style=flat-square" alt="Concurrent Development" />
+</p>
 
 ---
 
-## Existing KalimantanBio Platform
+## 🌴 Existing KalimantanBio Platform
 
 The broader KalimantanBio ecosystem and production context:
 
 [https://kalimantanbio.com/repository/](https://kalimantanbio.com/repository/)
 
+<p align="center">
+  <img src="https://kalimantanbio.com/media/species/Agathis_borneensis_Warburg_01_accept.jpg" alt="Kauri Borneo - Agathis borneensis" width="300" />
+</p>
+
+<p align="center">
+  <em>Kauri Borneo (Agathis borneensis) — Endangered conifer endemic to Borneo</em>
+</p>
+
 The existing platform provides a comprehensive biodiversity information system including:
-- Species database with 100+ documented records
-- Taxonomic classification and conservation status
-- Spatial distribution mapping
-- Forest coverage visualization
-- Repository and dataset services
-- Species identification tools
-- Research permit management
+
+- **Species database** with 100+ documented records
+- **Taxonomic classification** and conservation status (IUCN)
+- **Spatial distribution mapping** across Kalimantan
+- **Forest coverage visualization** via GIS
+- **Repository and dataset services** for research
+- **Species identification tools**
+- **Research permit management** with institutional partners
 
 The five Functional Programming modules extend this ecosystem with specialized intelligent and analytical capabilities for biodiversity knowledge exploration.
 
 ---
 
-## Explore the Five Modules
+## 🌿 Explore the Five Modules
 
 ```mermaid
 flowchart TB
@@ -52,15 +91,15 @@ The modules share a common project identity and biodiversity domain, but are des
 
 ---
 
-## One Platform. Five Independent Modules.
+## 📦 One Platform. Five Independent Modules.
 
 | Module | Focus | Capabilities |
 |--------|-------|--------------|
-| **Intelligent Species Search** | Species discovery | Natural-language queries, multi-attribute filtering, relevance ranking, related-query recommendations |
-| **Species Relationship Explorer** | Relationship exploration | Related species discovery, relationship scoring, explanations, interactive networks |
-| **Taxonomy & Classification Explorer** | Taxonomic understanding | Interactive taxonomic tree, taxon-based explorer, coverage analysis, endemic taxa, gap analysis |
-| **Comparative Species Explorer** | Species comparison | Multi-species comparison, shared/unique attributes, similarity scoring, distinguishing characteristics |
-| **Biodiversity Knowledge & Citation Explorer** | Scientific knowledge | Species-to-publication links, topic/location exploration, research coverage, understudied species, citation export |
+| **🔍 Intelligent Species Search** | Species discovery | Natural-language queries, multi-attribute filtering, relevance ranking, related-query recommendations |
+| **🕸️ Species Relationship Explorer** | Relationship exploration | Related species discovery, relationship scoring, explanations, interactive networks |
+| **🌳 Taxonomy & Classification Explorer** | Taxonomic understanding | Interactive taxonomic tree, taxon-based explorer, coverage analysis, endemic taxa, gap analysis |
+| **⚖️ Comparative Species Explorer** | Species comparison | Multi-species comparison, shared/unique attributes, similarity scoring, distinguishing characteristics |
+| **📚 Biodiversity Knowledge & Citation Explorer** | Scientific knowledge | Species-to-publication links, topic/location exploration, research coverage, understudied species, citation export |
 
 Each module is a first-class component with:
 - Clearly defined responsibility
@@ -71,24 +110,24 @@ Each module is a first-class component with:
 
 ---
 
-## How the Modules Fit Together
+## 🔗 How the Modules Fit Together
 
 ### Conceptual Relationship (Not Technical Dependency)
 
 ```mermaid
 flowchart TB
     subgraph DISCOVER["DISCOVER"]
-        M1["Intelligent Species Search"]
+        M1["🔍 Intelligent Species Search"]
     end
 
     subgraph EXPLORE["EXPLORE"]
-        M2["Species Relationship Explorer"]
-        M3["Taxonomy & Classification Explorer"]
+        M2["🕸️ Species Relationship Explorer"]
+        M3["🌳 Taxonomy & Classification Explorer"]
     end
 
     subgraph UNDERSTAND["UNDERSTAND"]
-        M4["Comparative Species Explorer"]
-        M5["Biodiversity Knowledge & Citation Explorer"]
+        M4["⚖️ Comparative Species Explorer"]
+        M5["📚 Biodiversity Knowledge & Citation Explorer"]
     end
 
     M1 -.-> M2
@@ -110,50 +149,55 @@ flowchart TB
 ### Development Model
 
 ```text
-Team 1 ──→ Intelligent Species Search
-Team 2 ──→ Species Relationship Explorer
-Team 3 ──→ Taxonomy & Classification Explorer
-Team 4 ──→ Comparative Species Explorer
-Team 5 ──→ Biodiversity Knowledge & Citation Explorer
+Team 1 ──→ 🔍 Intelligent Species Search
+Team 2 ──→ 🕸️ Species Relationship Explorer
+Team 3 ──→ 🌳 Taxonomy & Classification Explorer
+Team 4 ──→ ⚖️ Comparative Species Explorer
+Team 5 ──→ 📚 Biodiversity Knowledge & Citation Explorer
 ```
 
 Concurrent development with minimal coordination bottlenecks.
 
 ---
 
-## Functional Programming
+## ⚡ Functional Programming
 
 The modules apply Functional Programming principles where appropriate:
 
-- **Pure functions** for data transformation and analysis logic
-- **Immutability** for predictable state management
-- **Function composition** for building reusable analytical pipelines
-- **Higher-order functions** for flexible filtering, ranking, and transformation
-- **Declarative transformations** for biodiversity data processing
+| Principle | Application |
+|-----------|-------------|
+| **Pure functions** | Data transformation and analysis logic |
+| **Immutability** | Predictable state management |
+| **Function composition** | Reusable analytical pipelines |
+| **Higher-order functions** | Flexible filtering, ranking, transformation |
+| **Declarative transformations** | Biodiversity data processing |
 
 Functional Programming is part of the engineering approach, not the entire product identity.
 
 ---
 
-## Technology
+## 🛠️ Technology Stack
 
 The project specification recommends:
-- **Axum** — Rust web framework for performant APIs
-- **Django** — Python framework for interfaces and light computation
+
+| Technology | Role | Badge |
+|------------|------|-------|
+| **Axum** | Rust web framework for performant APIs | ![Axum](https://img.shields.io/badge/Axum-Rust%20Web%20Framework-000000?style=flat-square&logo=rust&logoColor=white) |
+| **Django** | Python framework for interfaces & light computation | ![Django](https://img.shields.io/badge/Django-Python%20Framework-092E20?style=flat-square&logo=django&logoColor=white) |
 
 Actual technology choices per module are determined by each team and documented in their respective repositories.
 
 ---
 
-## Architecture Overview
+## 🏗️ Architecture Overview
 
 ```
 KalimantanBio
-├── Intelligent Species Search
-├── Species Relationship Explorer
-├── Taxonomy & Classification Explorer
-├── Comparative Species Explorer
-└── Biodiversity Knowledge & Citation Explorer
+├── 🔍 Intelligent Species Search
+├── 🕸️ Species Relationship Explorer
+├── 🌳 Taxonomy & Classification Explorer
+├── ⚖️ Comparative Species Explorer
+└── 📚 Biodiversity Knowledge & Citation Explorer
 ```
 
 Each repository contains its own:
@@ -164,18 +208,18 @@ Each repository contains its own:
 
 ---
 
-## Project Links
+## 🔗 Project Links
 
 | Resource | Link |
 |----------|------|
 | **Project Specification** | <https://gusti-alfarisy.github.io/blog/2026/pbl-fp-2026/#kalimantanbio-biodiversity-knowledge-platform> |
 | **Existing Platform** | <https://kalimantanbio.com/repository/> |
-| **Organization** | <https://github.com/BorneoBiodiverse> |
+| **GitHub Organization** | <https://github.com/BorneoBiodiverse> |
 | **Project Management** | Trello (primary task management) |
 
 ---
 
-## Project Management
+## 📋 Project Management
 
 **Trello** is the primary task-management system for planning, assignments, progress tracking, and team coordination.
 
@@ -187,16 +231,24 @@ GitHub is used for:
 
 ---
 
-## Contributing
+## 🤝 Contributing
 
 Each module repository defines its own contribution guidelines. Please refer to the individual repository READMEs for setup, development workflow, and contribution processes.
 
 ---
 
-## License
+## 📄 License
 
 Individual modules may have their own licenses. Check each repository for details.
 
 ---
 
-*KalimantanBio — Making biodiversity knowledge easier to discover, explore, understand, compare, and reference.*
+<p align="center">
+  <em>KalimantanBio — Making biodiversity knowledge easier to discover, explore, understand, compare, and reference.</em>
+</p>
+
+<p align="center">
+  <img src="https://kalimantanbio.com/media/species/Alcedo_euryzona_accept.jpg" alt="Raja Udang Kalung-biru" width="200" />
+  <br />
+  <em>Raja Udang Kalung-biru (Alcedo euryzona) — Critically Endangered</em>
+</p>
