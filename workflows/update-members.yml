@@ -1,0 +1,70 @@
+name: Update Organization Members
+
+on:
+  schedule:
+    - cron: '0 6 * * *'  # Daily at 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-members:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Fetch organization members
+        id: members
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          MEMBERS=$(gh api /orgs/BorneoBiodiverse/members --paginate --jq '.[] | "\(.login)|\(.avatar_url)|\(.html_url)"')
+          echo "members<<EOF" >> $GITHUB_OUTPUT
+          echo "$MEMBERS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Update README with members
+        env:
+          MEMBERS: ${{ steps.members.outputs.members }}
+        run: |
+          README="profile/README.md"
+          
+          # Build members markdown table
+          MEMBERS_MD="| | |\n|---|---|\n"
+          while IFS='|' read -r login avatar_url html_url; do
+            [ -z "$login" ] && continue
+            MEMBERS_MD+="| <a href=\"$html_url\"><img src=\"$avatar_url\" width=\"50\" height=\"50\" style=\"border-radius: 50%;\" /></a> | **[@$login]($html_url)** |\n"
+          done <<< "$MEMBERS"
+          
+          if [ "$MEMBERS_MD" = "| | |\n|---|---|\n" ]; then
+            MEMBERS_MD="| | |\n|---|---|\n| No public members found | |\n"
+          fi
+          
+          # Add timestamp
+          TIMESTAMP="*Last updated: $(date -u +"%Y-%m-%d %H:%M UTC")*"
+          
+          # Replace content between ORG_MEMBERS_START and ORG_MEMBERS_END markers
+          awk -v members_md="$MEMBERS_MD" -v ts="$TIMESTAMP" '
+            /<!-- ORG_MEMBERS_START -->/ { print; print ""; print members_md; print ""; print ts; in_block=1; next }
+            /<!-- ORG_MEMBERS_END -->/ { in_block=0; print; next }
+            in_block { next }
+            { print }
+          ' "$README" > "$README.tmp" && mv "$README.tmp" "$README"
+
+      - name: Commit and push changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if ! git diff --quiet profile/README.md; then
+            git add profile/README.md
+            git commit -m "chore: update organization members [skip ci]"
+            git push
+          else
+            echo "No changes to commit"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}

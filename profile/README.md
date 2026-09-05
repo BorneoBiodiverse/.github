@@ -240,6 +240,16 @@ GitHub is used for:
 | <a href="https://github.com/sleepymor"><img src="https://avatars.githubusercontent.com/u/87416908?v=4" width="80" height="80" style="border-radius: 50%;" /></a> | **[@sleepymor](https://github.com/sleepymor)** — Project Leader & Organization Owner |
 | | KalimantanBio: Biodiversity Knowledge Platform |
 
+### Organization Members
+
+<!-- ORG_MEMBERS_START -->
+| | |
+|---|---|
+| No public members found | |
+<!-- ORG_MEMBERS_END -->
+
+*Last updated: $(date -u +"%Y-%m-%d %H:%M UTC")*
+
 ### Module Teams
 
 Five teams developing concurrently across five independent modules:
