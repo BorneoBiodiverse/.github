@@ -261,7 +261,6 @@ Five teams developing concurrently across five independent modules:
 | Team 4 | ⚖️ Comparative Species Explorer | Multi-species comparison & similarity |
 | Team 5 | 📚 Biodiversity Knowledge & Citation Explorer | Scientific literature & citation exploration |
 
-> **Note:** Organization members are private. Team members contribute through their respective module repositories.
 
 ---
 
