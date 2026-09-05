@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://play-lh.googleusercontent.com/hoRZ568WPBkAGlEZiBH2XjFjeojcZHIfoeV4k3k5FX2WECK26gRHDXp2O4Bf1s14A-OLjYwUBr0uLosYHqrPeAQ=w240-h480-rw" alt="KalimantanBio" width="180" height="180" />
+  <img src="https://avatars.githubusercontent.com/u/324422601?s=200&v=4" alt="KalimantanBio" width="180" height="180" />
 </p>
 
 <h1 align="center">KalimantanBio</h1>
