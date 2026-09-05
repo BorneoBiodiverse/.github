@@ -56,9 +56,13 @@ jobs:
           ' "$README" > "$README.tmp" && mv "$README.tmp" "$README"
 
       - name: Commit and push changes
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Configure git to use the PAT for pushing
+          git remote set-url origin https://x-access-token:${GH_PAT}@github.com/BorneoBiodiverse/.github.git
           if ! git diff --quiet profile/README.md; then
             git add profile/README.md
             git commit -m "chore: update organization members [skip ci]"
@@ -66,5 +70,3 @@ jobs:
           else
             echo "No changes to commit"
           fi
-        env:
-          GH_TOKEN: ${{ secrets.GH_PAT }}
