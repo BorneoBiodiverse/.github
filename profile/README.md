@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://kalimantanbio.com/media/logo.png" alt="KalimantanBio" width="180" height="180" />
+  <img src="https://gusti-alfarisy.github.io/assets/theme/images/posts/kalimantanbio_repo.png" alt="KalimantanBio" width="180" height="180" />
 </p>
 
 <h1 align="center">KalimantanBio</h1>
