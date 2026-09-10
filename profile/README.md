@@ -7,14 +7,9 @@
 <p align="center">
   <strong>Biodiversity Knowledge Platform</strong>
 </p>
-
 <p align="center">
   Discover the biodiversity of Kalimantan.<br />
   Explore species, relationships, taxonomy, comparisons, and scientific knowledge.
-</p>
-
-<p align="center">
-  <strong>One platform. Five independent modules.</strong>
 </p>
 
 <p align="center">
@@ -33,8 +28,6 @@
   <img src="https://img.shields.io/badge/Rust-Axum-000000?style=flat-square&logo=rust&logoColor=white" alt="Axum" />
   <img src="https://img.shields.io/badge/Python-Django-092E20?style=flat-square&logo=django&logoColor=white" alt="Django" />
   <img src="https://img.shields.io/badge/Functional%20Programming-Principles-8b5cf6?style=flat-square&logo=lambda&logoColor=white" alt="Functional Programming" />
-  <img src="https://img.shields.io/badge/Architecture-Loosely%20Coupled-238636?style=flat-square" alt="Loosely Coupled" />
-  <img src="https://img.shields.io/badge/Development-Concurrent-f97583?style=flat-square" alt="Concurrent Development" />
 </p>
 
 ---
@@ -63,106 +56,13 @@ The existing platform provides a comprehensive biodiversity information system i
 - **Species identification tools**
 - **Research permit management** with institutional partners
 
-The five Functional Programming modules extend this ecosystem with specialized intelligent and analytical capabilities for biodiversity knowledge exploration.
-
----
-
-## 🌿 Explore the Five Modules
-
-```mermaid
-flowchart TB
-    KB["KalimantanBio<br/>Biodiversity Knowledge Platform"]
-
-    KB --> M1["Intelligent Species Search"]
-    KB --> M2["Species Relationship Explorer"]
-    KB --> M3["Taxonomy & Classification Explorer"]
-    KB --> M4["Comparative Species Explorer"]
-    KB --> M5["Biodiversity Knowledge & Citation Explorer"]
-
-    style KB fill:#1f6feb,color:#fff
-    style M1 fill:#238636,color:#fff
-    style M2 fill:#238636,color:#fff
-    style M3 fill:#238636,color:#fff
-    style M4 fill:#238636,color:#fff
-    style M5 fill:#238636,color:#fff
-```
-
-The modules share a common project identity and biodiversity domain, but are designed for independent development with minimal technical coupling.
-
----
-
-## 📦 One Platform. Five Independent Modules.
-
-| Module | Focus | Capabilities |
-|--------|-------|--------------|
-| **🔍 Intelligent Species Search** | Species discovery | Natural-language queries, multi-attribute filtering, relevance ranking, related-query recommendations |
-| **🕸️ Species Relationship Explorer** | Relationship exploration | Related species discovery, relationship scoring, explanations, interactive networks |
-| **🌳 Taxonomy & Classification Explorer** | Taxonomic understanding | Interactive taxonomic tree, taxon-based explorer, coverage analysis, endemic taxa, gap analysis |
-| **⚖️ Comparative Species Explorer** | Species comparison | Multi-species comparison, shared/unique attributes, similarity scoring, distinguishing characteristics |
-| **📚 Biodiversity Knowledge & Citation Explorer** | Scientific knowledge | Species-to-publication links, topic/location exploration, research coverage, understudied species, citation export |
-
-Each module is a first-class component with:
-- Clearly defined responsibility
-- Independent development, testing, and documentation
-- Separate repository and team
-- Minimal cross-module dependencies
-- Independent implementation lifecycle
-
----
-
-## 🔗 How the Modules Fit Together
-
-### Conceptual Relationship (Not Technical Dependency)
-
-```mermaid
-flowchart TB
-    subgraph DISCOVER["DISCOVER"]
-        M1["🔍 Intelligent Species Search"]
-    end
-
-    subgraph EXPLORE["EXPLORE"]
-        M2["🕸️ Species Relationship Explorer"]
-        M3["🌳 Taxonomy & Classification Explorer"]
-    end
-
-    subgraph UNDERSTAND["UNDERSTAND"]
-        M4["⚖️ Comparative Species Explorer"]
-        M5["📚 Biodiversity Knowledge & Citation Explorer"]
-    end
-
-    M1 -.-> M2
-    M1 -.-> M3
-    M2 -.-> M4
-    M3 -.-> M4
-    M2 -.-> M5
-    M3 -.-> M5
-    M4 -.-> M5
-
-    style DISCOVER fill:#f6f8fa,stroke:#d0d7de
-    style EXPLORE fill:#f6f8fa,stroke:#d0d7de
-    style UNDERSTAND fill:#f6f8fa,stroke:#d0d7de
-```
-
-> **Dashed lines indicate conceptual complementarity, not technical dependencies.**  
-> A user may benefit from using multiple modules, but no module requires another to function.
-
-### Development Model
-
-```text
-Team 1 ──→ 🔍 Intelligent Species Search
-Team 2 ──→ 🕸️ Species Relationship Explorer
-Team 3 ──→ 🌳 Taxonomy & Classification Explorer
-Team 4 ──→ ⚖️ Comparative Species Explorer
-Team 5 ──→ 📚 Biodiversity Knowledge & Citation Explorer
-```
-
-Concurrent development with minimal coordination bottlenecks.
+This ecosystem is extended with specialized intelligent and analytical capabilities for biodiversity knowledge exploration.
 
 ---
 
 ## ⚡ Functional Programming
 
-The modules apply Functional Programming principles where appropriate:
+Functional Programming principles are applied where appropriate:
 
 | Principle | Application |
 |-----------|-------------|
@@ -185,26 +85,7 @@ The project specification recommends:
 | **Axum** | Rust web framework for performant APIs | ![Axum](https://img.shields.io/badge/Axum-Rust%20Web%20Framework-000000?style=flat-square&logo=rust&logoColor=white) |
 | **Django** | Python framework for interfaces & light computation | ![Django](https://img.shields.io/badge/Django-Python%20Framework-092E20?style=flat-square&logo=django&logoColor=white) |
 
-Actual technology choices per module are determined by each team and documented in their respective repositories.
-
----
-
-## 🏗️ Architecture Overview
-
-```
-KalimantanBio
-├── 🔍 Intelligent Species Search
-├── 🕸️ Species Relationship Explorer
-├── 🌳 Taxonomy & Classification Explorer
-├── ⚖️ Comparative Species Explorer
-└── 📚 Biodiversity Knowledge & Citation Explorer
-```
-
-Each repository contains its own:
-- README with setup and usage instructions
-- Architecture and implementation documentation
-- Tests and development workflow
-- Independent release cycle
+Actual technology choices are determined by each team and documented in their respective repositories.
 
 ---
 
@@ -250,30 +131,17 @@ GitHub is used for:
 *Last updated: 2026-09-09 16:16 UTC*
 <!-- ORG_MEMBERS_END -->
 
-### Module Teams
-
-Five teams developing concurrently across five independent modules:
-
-| Team | Module | Focus |
-|------|--------|-------|
-| Team 1 | 🔍 Intelligent Species Search | Natural-language species discovery & filtering |
-| Team 2 | 🕸️ Species Relationship Explorer | Species relationships & network exploration |
-| Team 3 | 🌳 Taxonomy & Classification Explorer | Taxonomic structure & classification |
-| Team 4 | ⚖️ Comparative Species Explorer | Multi-species comparison & similarity |
-| Team 5 | 📚 Biodiversity Knowledge & Citation Explorer | Scientific literature & citation exploration |
-
-
 ---
 
 ## 🤝 Contributing
 
-Each module repository defines its own contribution guidelines. Please refer to the individual repository READMEs for setup, development workflow, and contribution processes.
+Please refer to the individual repository READMEs for setup, development workflow, and contribution processes.
 
 ---
 
 ## 📄 License
 
-Individual modules may have their own licenses. Check each repository for details.
+Check each repository for license details.
 
 ---
 
