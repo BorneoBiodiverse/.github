@@ -4,7 +4,7 @@
 **Bahasa:** Rust
 **Cakupan:** Natural-language species search, multi-attribute filtering, relevance ranking, related-query recommendation
 
-**Repository**: Part of KalimantanBio monorepo workspace (`crates/module1-species-search`)  
+**Repository**: Part of KalimantanBio monorepo workspace (`crates/species-search`)  
 **API Integration**: Production KalimantanBio API (PostgreSQL via shared library)
 
 > **PENTING**: Modul ini menggunakan **Shared Library** (`kalimantanbio-shared`) untuk tipe data dan fungsi umum. Lihat [MASTERPLAN.md](../MASTERPLAN.md) untuk arsitektur lengkap.

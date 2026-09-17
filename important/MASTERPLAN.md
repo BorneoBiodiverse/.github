@@ -255,7 +255,7 @@ kalimantanbio/
     │       ├── taxonomy.json
     │       └── observations.json
     │
-    ├── module1-species-search/            # Module 1
+    ├── species-search/                    # Module 1: Intelligent Species Search
     │   ├── Cargo.toml
     │   ├── README.md
     │   └── src/
@@ -265,7 +265,7 @@ kalimantanbio/
     │       ├── scoring.rs
     │       └── recommendation.rs
     │
-    ├── module2-relationship/              # Module 2
+    ├── species-relationships/             # Module 2: Species Relationship Explorer
     │   ├── Cargo.toml
     │   ├── README.md
     │   └── src/
@@ -275,7 +275,7 @@ kalimantanbio/
     │       ├── scoring.rs
     │       └── network.rs
     │
-    ├── module3-taxonomy/                  # Module 3
+    ├── taxonomy/                          # Module 3: Taxonomy & Classification Explorer
     │   ├── Cargo.toml
     │   ├── README.md
     │   └── src/
@@ -285,7 +285,7 @@ kalimantanbio/
     │       ├── diversity.rs
     │       └── gap_analysis.rs
     │
-    ├── module4-comparison/                # Module 4
+    ├── species-comparison/                # Module 4: Comparative Species Explorer
     │   ├── Cargo.toml
     │   ├── README.md
     │   └── src/
@@ -295,7 +295,7 @@ kalimantanbio/
     │       ├── analysis.rs
     │       └── similarity.rs
     │
-    ├── module5-knowledge/                 # Module 5
+    ├── knowledge-citations/               # Module 5: Biodiversity Knowledge & Citation Explorer
     │   ├── Cargo.toml
     │   ├── README.md
     │   └── src/
@@ -330,11 +330,11 @@ kalimantanbio/
 [workspace]
 members = [
     "crates/shared",
-    "crates/module1-species-search",
-    "crates/module2-relationship",
-    "crates/module3-taxonomy",
-    "crates/module4-comparison",
-    "crates/module5-knowledge",
+    "crates/species-search",
+    "crates/species-relationships",
+    "crates/taxonomy",
+    "crates/species-comparison",
+    "crates/knowledge-citations",
     "crates/api-server",
 ]
 resolver = "2"
@@ -710,7 +710,7 @@ All modules can use these fixtures for unit testing without database dependency.
 
 ### 6.1 Module 1: Intelligent Species Search
 
-**Crate**: `module1-species-search`  
+**Crate**: `species-search`  
 **Routes**: `/api/v1/search`  
 **Team Size**: 5 members  
 
@@ -734,7 +734,7 @@ All modules can use these fixtures for unit testing without database dependency.
 
 ### 6.2 Module 2: Species Relationship Explorer
 
-**Crate**: `module2-relationship`  
+**Crate**: `species-relationships`  
 **Routes**: `/api/v1/species/:id/relationships`  
 **Team Size**: 3 members  
 
@@ -758,7 +758,7 @@ All modules can use these fixtures for unit testing without database dependency.
 
 ### 6.3 Module 3: Taxonomy & Classification Explorer
 
-**Crate**: `module3-taxonomy`  
+**Crate**: `taxonomy`  
 **Routes**: `/api/v1/taxonomy/*`  
 **Team Size**: 1 member  
 
@@ -782,7 +782,7 @@ All modules can use these fixtures for unit testing without database dependency.
 
 ### 6.4 Module 4: Comparative Species Explorer
 
-**Crate**: `module4-comparison`  
+**Crate**: `species-comparison`  
 **Routes**: `/api/v1/compare`  
 **Team Size**: 5 members  
 
@@ -806,7 +806,7 @@ All modules can use these fixtures for unit testing without database dependency.
 
 ### 6.5 Module 5: Biodiversity Knowledge & Citation Explorer
 
-**Crate**: `module5-knowledge`  
+**Crate**: `knowledge-citations`  
 **Routes**: `/api/v1/publications`, `/api/v1/citations`  
 **Team Size**: 5 members  
 
@@ -1275,7 +1275,7 @@ Weeks 6-8: Testing & Deployment
 ### 11.2 Module Teams
 
 #### Module 1 Team (5 Members)
-**Crate**: `module1-species-search`  
+**Crate**: `species-search`  
 **Responsibilities**:
 - Natural language query parsing
 - Multi-attribute filtering logic
@@ -1284,7 +1284,7 @@ Weeks 6-8: Testing & Deployment
 - Unit tests and documentation
 
 #### Module 2 Team (3 Members)
-**Crate**: `module2-relationship`  
+**Crate**: `species-relationships`  
 **Responsibilities**:
 - Evidence extraction logic
 - Relationship scoring
@@ -1293,13 +1293,13 @@ Weeks 6-8: Testing & Deployment
 - Unit tests and documentation
 
 #### Module 3 Team (1 Member)
-**Crate**: `module3-taxonomy`  
+**Crate**: `taxonomy`  
 **Responsibilities**:
 - All module functionality (tree, diversity, gaps)
 - Unit tests and documentation
 
 #### Module 4 Team (5 Members)
-**Crate**: `module4-comparison`  
+**Crate**: `species-comparison`  
 **Responsibilities**:
 - Attribute matrix construction
 - Similarity scoring logic
@@ -1307,7 +1307,7 @@ Weeks 6-8: Testing & Deployment
 - Unit tests and documentation
 
 #### Module 5 Team (5 Members)
-**Crate**: `module5-knowledge`  
+**Crate**: `knowledge-citations`  
 **Responsibilities**:
 - Publication parsing
 - Timeline and coverage analysis

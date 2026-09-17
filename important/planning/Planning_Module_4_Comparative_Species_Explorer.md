@@ -4,11 +4,12 @@
 **Bahasa:** Rust  
 **Cakupan:** Pembangunan sistem perbandingan beberapa spesies di Kalimantan berdasarkan data taksonomi, atribut spesies, status konservasi, serta data observasi dan distribusi geografis untuk mengidentifikasi persamaan, perbedaan, karakteristik unik, dan tingkat kemiripan antarspesies.
 
-**Repository:** `kalimantanbio-modul4-comparative-explorer`
+**Repository:** Part of KalimantanBio monorepo workspace (`crates/species-comparison`)  
+**API Integration:** Production KalimantanBio API (PostgreSQL via shared library)
 
-**Sumber data:** `kalimantan-bio-demo-api` — endpoint spesies, taksonomi, dan observasi.
+> **PENTING**: Modul ini menggunakan **Shared Library** (`kalimantanbio-shared`) untuk tipe data dan fungsi umum. Lihat [MASTERPLAN.md](../MASTERPLAN.md) untuk arsitektur lengkap.
 
-> **Catatan integrasi:** API demo menyediakan data spesies dengan atribut `species_type`, `iucn`, `cites`, `p106`, taksonomi lengkap (kingdom → genus), serta data observasi per kabupaten. Atribut seperti habitat/morphology tidak tersedia di API aktual; scope perbandingan disesuaikan dengan data yang benar-benar ada.
+> **Catatan integrasi:** Production KalimantanBio database menyediakan data spesies dengan atribut `species_type`, `iucn`, `cites`, taksonomi lengkap (kingdom → genus), serta data observasi per kabupaten. Scope perbandingan disesuaikan dengan data yang benar-benar ada. Akses database melalui shared library.
 
 ---
 
@@ -41,84 +42,99 @@ Modul ini **tidak bertanggung jawab** terhadap:
 
 ---
 
-## 2. Struktur Data (Domain Model)
+## 2. Shared Library Integration
 
-Struktur data di bawah disusun berdasarkan response nyata dari `kalimantan-bio-demo-api` dan kebutuhan komparasi modul ini.
+Modul ini menggunakan **shared library** (`kalimantanbio-shared`) untuk tipe data dan fungsi umum yang digunakan bersama dengan modul lain.
+
+### 2.1 Shared Types Used
 
 ```rust
-#[derive(Debug, Clone)]
-struct Taxonomy {
-    kingdom: String,
-    kingdom_id: u64,
-    phylum_division: String,
-    phylum_division_id: u64,
-    class: String,
-    class_id: u64,
-    order: String,
-    order_id: u64,
-    family: String,
-    family_id: u64,
-    genus: String,
-    genus_id: u64,
-}
+use kalimantanbio_shared::core::{Species, Taxonomy, Observation};
+```
 
-#[derive(Debug, Clone)]
-struct Species {
-    id: u64,
-    scientific_name: String,
-    common_name: String,
-    description: String,
-    species_type: String,        // "Endemic", "Native", "Introduced"
-    iucn: String,                // "CR", "EN", "VU", "NT", "LC", "DD", "-"
-    cites: String,               // "Appendix I", "Appendix II", "Appendix III", "-"
-    p106: String,                // "Dilindungi", "Tidak Dilindungi", "-"
-    is_verified: bool,
-    image_url: String,
-    ai_key: i32,
-    genus_id: u64,
-    taxonomy: Taxonomy,
-    observation_count: u32,
-    recorded_individuals_total: u32,
-    latest_observation_year: Option<u32>,
-}
+- `Species` - Struktur data lengkap spesies dari production database
+- `Taxonomy` - Struktur hierarki taksonomi (kingdom → genus)
+- `Observation` - Data observasi per kabupaten (distribusi geografis)
 
-#[derive(Debug, Clone)]
-struct Observation {
-    id: u64,
-    species_id: u64,
-    latitude: f64,
-    longitude: f64,
-    date: String,
-    count: i32,
-    is_verified: bool,
-    source_method: String,
-    kabupaten_id: u64,
-    kabupaten_name: String,
-    province_name: String,
-}
+### 2.2 Shared Functions Used
 
+#### From `taxonomy` module:
+```rust
+use kalimantanbio_shared::taxonomy::{build_taxonomy_path, calculate_taxonomy_similarity};
+```
+
+- `build_taxonomy_path(taxonomy: &Taxonomy) -> String` - Menyusun string path taksonomi `"Kingdom > Phylum > Class > Order > Family > Genus"`
+- `calculate_taxonomy_similarity(a: &Taxonomy, b: &Taxonomy) -> f64` - Menghitung skor kesamaan taksonomi (0.0–1.0)
+
+**Digunakan di**: Tahap 2 (Attribute Matrix), Tahap 4 (Similarity Scoring)
+
+#### From `collections` module:
+```rust
+use kalimantanbio_shared::collections::jaccard_similarity;
+```
+
+- `jaccard_similarity<T>(a: &HashSet<T>, b: &HashSet<T>) -> f64` - Menghitung kesamaan set (untuk distribusi kabupaten)
+
+**Digunakan di**: Tahap 4 (Similarity Scoring)
+
+#### From `scoring` module:
+```rust
+use kalimantanbio_shared::scoring::{combine_weighted_scores, rank_by_score, top_n};
+```
+
+- `combine_weighted_scores(scores: &[(f64, f64)]) -> f64` - Menggabungkan skor dengan bobot
+- `rank_by_score<T>(items: Vec<(T, f64)>) -> Vec<(T, f64)>` - Mengurutkan skor menurun
+- `top_n<T>(items: Vec<(T, f64)>, n: usize) -> Vec<(T, f64)>` - Mengambil N tertinggi
+
+**Digunakan di**: Tahap 4 (Similarity Scoring), Tahap 5 (Summary Generation)
+
+#### From `validation` module:
+```rust
+use kalimantanbio_shared::validation::validate_id_list;
+```
+
+- `validate_id_list(ids: &[u64], min: usize, max: usize) -> Result<()>` - Memvalidasi jumlah ID minimal/maksimal, no duplikat
+
+**Digunakan di**: Tahap 1 (Data Validation)
+
+#### From `db` module:
+```rust
+use kalimantanbio_shared::db::{create_pool, fetch_all_species, fetch_observations_for_species};
+```
+
+- `create_pool(database_url: &str) -> Result<Pool<Postgres>>` - Membuat connection pool
+- `fetch_all_species(pool: &Pool<Postgres>) -> Result<Vec<Species>>` - Fetch semua spesies
+- `fetch_observations_for_species(pool: &Pool<Postgres>, species_id: u64) -> Result<Vec<Observation>>` - Fetch observasi per spesies
+
+**Digunakan di**: Tahap 5 (Integrasi Pipeline & Testing)
+
+### 2.3 Module-Specific Types
+
+Modul ini mendefinisikan tipe tambahan yang spesifik untuk perbandingan:
+
+```rust
 #[derive(Debug, Clone, Default)]
 struct ComparisonQuery {
-    species_ids: Vec<u64>,   // minimal 2 spesies, maksimal disepakati tim (mis. 5)
+    species_ids: Vec<u64>,
 }
 
 #[derive(Debug, Clone)]
 struct ScoringWeights {
-    taxonomy: f64,      // default: 0.40
-    conservation: f64,  // default: 0.30
-    species_type: f64,  // default: 0.15
-    distribution: f64,  // default: 0.15
+    taxonomy: f64,
+    conservation: f64,
+    species_type: f64,
+    distribution: f64,
 }
 
 #[derive(Debug, Clone)]
 struct SimilarityScore {
     species_a_id: u64,
     species_b_id: u64,
-    taxonomy_score: f64,       
-    conservation_score: f64,   
-    type_score: f64,           
-    distribution_score: f64,   
-    total_score: f64,          
+    taxonomy_score: f64,
+    conservation_score: f64,
+    type_score: f64,
+    distribution_score: f64,
+    total_score: f64,
 }
 
 #[derive(Debug, Clone)]
@@ -126,7 +142,7 @@ struct SpeciesAttributeRow {
     species_id: u64,
     scientific_name: String,
     common_name: String,
-    taxonomy_path: String,    
+    taxonomy_path: String,
     species_type: String,
     iucn: String,
     cites: String,
@@ -139,16 +155,87 @@ struct SpeciesAttributeRow {
 #[derive(Debug, Clone, Default)]
 struct ComparisonResult {
     query: ComparisonQuery,
-    attribute_matrix: Vec<SpeciesAttributeRow>, 
-    shared_attributes: Vec<String>,              
-    unique_attributes: Vec<String>,               
-    distinguishing_characteristics: Vec<String>, 
-    similarity_scores: Vec<SimilarityScore>,      
-    summary: String,                               
+    attribute_matrix: Vec<SpeciesAttributeRow>,
+    shared_attributes: Vec<String>,
+    unique_attributes: Vec<String>,
+    distinguishing_characteristics: Vec<String>,
+    similarity_scores: Vec<SimilarityScore>,
+    summary: String,
 }
 ```
 
-> **Catatan:** Struktur data perlu disepakati oleh seluruh anggota kelompok sebelum implementasi karena struktur ini menjadi dasar bagi fungsi-fungsi pada tahap berikutnya. `taxonomy_score` menggunakan level kesamaan takson: genus=1.0, family=0.8, order=0.6, class=0.4, phylum=0.2, kingdom=0.1, tidak ada kesamaan=0.0. Total bobot `ScoringWeights` harus = 1.0.
+### 2.4 Cargo.toml Dependency
+
+```toml
+[dependencies]
+kalimantanbio-shared = { path = "../shared" }
+serde = { workspace = true }
+tokio = { workspace = true }
+```
+
+### 2.5 Integration Example
+
+```rust
+use kalimantanbio_shared::{
+    core::{Species, Taxonomy, Observation},
+    taxonomy::{build_taxonomy_path, calculate_taxonomy_similarity},
+    collections::jaccard_similarity,
+    scoring::combine_weighted_scores,
+    validation::validate_id_list,
+};
+use std::collections::HashSet;
+
+pub fn calculate_pair_similarity(
+    a: &Species,
+    b: &Species,
+    kabupaten_a: &HashSet<u64>,
+    kabupaten_b: &HashSet<u64>,
+    weights: &ScoringWeights,
+) -> SimilarityScore {
+    // Validasi jumlah spesies via shared library
+    // (dipanggil sekali di level query)
+
+    // Skor taksonomi via shared library
+    let taxonomy_score = calculate_taxonomy_similarity(&a.taxonomy, &b.taxonomy);
+
+    // Skor distribusi via shared library (Jaccard)
+    let distribution_score = jaccard_similarity(kabupaten_a, kabupaten_b);
+
+    // Gabungkan skor via shared library
+    let total = combine_weighted_scores(&[
+        (taxonomy_score, weights.taxonomy),
+        (conservation_score, weights.conservation),
+        (type_score, weights.species_type),
+        (distribution_score, weights.distribution),
+    ]);
+
+    SimilarityScore {
+        species_a_id: a.id,
+        species_b_id: b.id,
+        taxonomy_score,
+        conservation_score,
+        type_score,
+        distribution_score,
+        total_score: total,
+    }
+}
+```
+
+---
+
+## 3. Struktur Data (Domain Model)
+
+### 3.1 Tipe dari Shared Library
+
+Modul ini menggunakan `Species`, `Taxonomy`, dan `Observation` dari shared library. Lihat [MASTERPLAN.md](../MASTERPLAN.md) untuk definisi lengkap.
+
+> **Catatan:** Struktur data sudah distandardisasi di shared library dan digunakan oleh semua modul. Tidak boleh ada modifikasi pada tipe ini tanpa koordinasi dengan project lead.
+
+### 3.2 Module-Specific Types
+
+Tipe berikut spesifik untuk Modul 4 (`ComparisonQuery`, `ScoringWeights`, `SimilarityScore`, `SpeciesAttributeRow`, `ComparisonResult`) sudah didefinisikan di bagian 2.3.
+
+> **Catatan:** `taxonomy_score` menggunakan level kesamaan takson dari shared library. Total bobot `ScoringWeights` harus = 1.0.
 
 ### Data yang Digunakan
 
@@ -166,37 +253,38 @@ struct ComparisonResult {
 
 ---
 
-## 3. Tahap 1 — Data Retrieval & Validation
+## 4. Tahap 1 — Data Retrieval & Validation
 
-Mengambil data spesies dari sumber data (API atau fixture), memvalidasi input query pengguna, dan menyiapkan data yang siap diproses oleh tahap berikutnya.
+Mengambil data spesies dari source data (production database via shared library atau fixture), memvalidasi input query pengguna, dan menyiapkan data yang siap diproses oleh tahap berikutnya.
 
 | Fungsi | Signature | Deskripsi |
 | -------------- | ----------------------------- | ------------------ |
-| `validate_query` | `fn validate_query(query: &ComparisonQuery) -> Result<(), QueryError>` | Memvalidasi query: minimal 2 ID spesies, tidak ada duplikasi, tidak melebihi batas maksimal yang disepakati. Mengembalikan `QueryError::TooFewSpecies`, `QueryError::DuplicateId`, atau `QueryError::TooManySpecies` sesuai kondisi. |
-| `fetch_species_by_ids` | `fn fetch_species_by_ids<'a>(ids: &[u64], all_species: &'a [Species]) -> Result<Vec<&'a Species>, DataError>` | Mengambil spesies berdasarkan ID dari slice data yang tersedia menggunakan `.filter()`. Mengembalikan `DataError::SpeciesNotFound(id)` jika ada ID yang tidak ditemukan. |
-| `fetch_observations_for_species` | `fn fetch_observations_for_species(species_id: u64, all_observations: &[Observation]) -> Vec<&Observation>` | Mengambil semua data observasi untuk satu spesies menggunakan `.filter()`. Mengembalikan slice kosong jika tidak ada observasi. |
-| `build_kabupaten_set` | `fn build_kabupaten_set(observations: &[&Observation]) -> std::collections::HashSet<u64>` | Mengekstrak set unik `kabupaten_id` dari observasi suatu spesies menggunakan `.map().collect()`. |
+| `validate_query` | `fn validate_query(query: &ComparisonQuery) -> Result<(), QueryError>` | **Uses SHARED `validate_id_list`**: Memvalidasi query: minimal 2 ID spesies, tidak ada duplikasi, tidak melebihi batas maksimal yang disepakati. Mengembalikan `QueryError::TooFewSpecies`, `QueryError::DuplicateId`, atau `QueryError::TooManySpecies` sesuai kondisi. |
+| `retrieve_species` | **FROM SHARED LIBRARY**: `kalimantanbio_shared::db::fetch_all_species` | Mengambil seluruh data spesies dari production database (atau fixture). |
+| `fetch_species_by_ids` | `fn fetch_species_by_ids<'a>(ids: &[u64], all_species: &'a [Species]) -> Result<Vec<&'a Species>, DataError>` | **MODULE-SPECIFIC**: Mengambil spesies berdasarkan ID dari slice data yang tersedia menggunakan `.filter()`. Mengembalikan `DataError::SpeciesNotFound(id)` jika ada ID yang tidak ditemukan. |
+| `fetch_observations_for_species` | **FROM SHARED LIBRARY**: `kalimantanbio_shared::db::fetch_observations_for_species` | Mengambil semua data observasi untuk satu spesies. Mengembalikan slice kosong jika tidak ada observasi. |
+| `build_kabupaten_set` | `fn build_kabupaten_set(observations: &[&Observation]) -> std::collections::HashSet<u64>` | **MODULE-SPECIFIC**: Mengekstrak set unik `kabupaten_id` dari observasi suatu spesies menggunakan `.map().collect()`. |
 
 **Person in Charge:** **(isi nama anggota)**
 
 ---
 
-## 4. Tahap 2 — Attribute Matrix Construction
+## 5. Tahap 2 — Attribute Matrix Construction
 
 Membangun matriks atribut per spesies sebagai representasi terstruktur dari setiap spesies yang dibandingkan, termasuk menyusun taxonomy path yang mudah dibaca.
 
 | Fungsi | Signature | Deskripsi |
 | -------------- | ----------------------------- | ------------------ |
-| `build_taxonomy_path` | `fn build_taxonomy_path(taxonomy: &Taxonomy) -> String` | Menyusun string path taksonomi menggunakan format `"Kingdom > Phylum > Class > Order > Family > Genus"` (mis. `"Animalia > Chordata > Mammalia > Primates > Hominidae > Pongo"`). |
-| `build_attribute_row` | `fn build_attribute_row(species: &Species, observations: &[&Observation]) -> SpeciesAttributeRow` | Membangun satu baris atribut spesies termasuk taxonomy path dan daftar nama kabupaten observasi unik. |
-| `build_attribute_matrix` | `fn build_attribute_matrix(species_list: &[&Species], all_observations: &[Observation]) -> Vec<SpeciesAttributeRow>` | Menerapkan `build_attribute_row` ke setiap spesies menggunakan `.map().collect()` untuk menghasilkan matriks atribut lengkap. |
-| `extract_attribute_values` | `fn extract_attribute_values(matrix: &[SpeciesAttributeRow], key: &str) -> Vec<String>` | Mengekstrak nilai satu atribut tertentu (mis. `"iucn"`, `"species_type"`) dari seluruh baris matriks, untuk digunakan pada analisis kesamaan dan perbedaan. |
+| `build_taxonomy_path` | **FROM SHARED LIBRARY**: `kalimantanbio_shared::taxonomy::build_taxonomy_path` | Menyusun string path taksonomi menggunakan format `"Kingdom > Phylum > Class > Order > Family > Genus"` (mis. `"Animalia > Chordata > Mammalia > Primates > Hominidae > Pongo"`). |
+| `build_attribute_row` | `fn build_attribute_row(species: &Species, observations: &[&Observation]) -> SpeciesAttributeRow` | **MODULE-SPECIFIC**: Membangun satu baris atribut spesies termasuk taxonomy path (via shared library) dan daftar nama kabupaten observasi unik. |
+| `build_attribute_matrix` | `fn build_attribute_matrix(species_list: &[&Species], all_observations: &[Observation]) -> Vec<SpeciesAttributeRow>` | **MODULE-SPECIFIC**: Menerapkan `build_attribute_row` ke setiap spesies menggunakan `.map().collect()` untuk menghasilkan matriks atribut lengkap. |
+| `extract_attribute_values` | `fn extract_attribute_values(matrix: &[SpeciesAttributeRow], key: &str) -> Vec<String>` | **MODULE-SPECIFIC**: Mengekstrak nilai satu atribut tertentu (mis. `"iucn"`, `"species_type"`) dari seluruh baris matriks, untuk digunakan pada analisis kesamaan dan perbedaan. |
 
 **Person in Charge:** **(isi nama anggota)**
 
 ---
 
-## 5. Tahap 3 — Shared & Unique Attribute Analysis
+## 6. Tahap 3 — Shared & Unique Attribute Analysis
 
 Menganalisis matriks atribut untuk menemukan atribut yang sama di semua spesies, atribut yang unik per spesies, dan karakteristik paling membedakan.
 
@@ -211,32 +299,36 @@ Menganalisis matriks atribut untuk menemukan atribut yang sama di semua spesies,
 
 ---
 
-## 6. Tahap 4 — Similarity Scoring
+## 7. Tahap 4 — Similarity Scoring
 
 Menghitung skor kemiripan untuk setiap pasang spesies yang dibandingkan berdasarkan empat dimensi: taksonomi, konservasi, tipe spesies, dan distribusi geografis.
 
+> **Catatan**: Fungsi `calculate_taxonomy_similarity`, `jaccard_similarity`, `combine_weighted_scores`, dan `rank_by_score` menggunakan **shared library**.
+
 | Fungsi | Signature | Deskripsi |
 | -------------- | ----------------------------- | ------------------ |
-| `score_taxonomy` | `fn score_taxonomy(a: &Taxonomy, b: &Taxonomy) -> f64` | Menghitung skor taksonomi (0.0–1.0) berdasarkan level takson tertinggi yang sama. Skala: genus=1.0, family=0.8, order=0.6, class=0.4, phylum=0.2, kingdom=0.1, tidak ada kesamaan=0.0. Diimplementasikan dengan pengecekan bertahap dari bawah ke atas menggunakan perbandingan ID. |
-| `score_conservation` | `fn score_conservation(a: &Species, b: &Species) -> f64` | Menghitung rata-rata kesamaan tiga atribut konservasi (`iucn`, `cites`, `p106`). Tiap atribut: 1.0 jika identik, 0.5 jika salah satu bernilai `"-"`, 0.0 jika berbeda. Rata-rata dari ketiga nilai. |
-| `score_species_type` | `fn score_species_type(a: &Species, b: &Species) -> f64` | Mengembalikan 1.0 jika `species_type` identik (case-insensitive), 0.0 jika berbeda. |
-| `score_distribution` | `fn score_distribution(obs_a: &std::collections::HashSet<u64>, obs_b: &std::collections::HashSet<u64>) -> f64` | Menghitung Jaccard Similarity dari set kabupaten observasi: `|intersection| / |union|`. Mengembalikan 0.0 jika salah satu atau keduanya kosong (menghindari division by zero). |
-| `calculate_similarity_score` | `fn calculate_similarity_score(a: &Species, b: &Species, obs_a: &std::collections::HashSet<u64>, obs_b: &std::collections::HashSet<u64>, weights: &ScoringWeights) -> SimilarityScore` | Menggabungkan keempat skor dengan bobot dari `weights` menjadi `total_score` menggunakan weighted sum. |
-| `calculate_all_pairs` | `fn calculate_all_pairs(species_list: &[&Species], observations_map: &std::collections::HashMap<u64, std::collections::HashSet<u64>>, weights: &ScoringWeights) -> Vec<SimilarityScore>` | Menghasilkan semua kombinasi pasang spesies (n*(n-1)/2) dan menghitung skor tiap pasang. Menggunakan nested iterator dengan `.enumerate().flat_map()`. |
-| `find_most_similar` | `fn find_most_similar(target_id: u64, scores: &[SimilarityScore]) -> Option<SimilarityScore>` | Menemukan pasang dengan `total_score` tertinggi yang melibatkan `target_id` menggunakan `.filter().max_by()`. Mengembalikan `None` jika tidak ada pasang yang ditemukan. |
+| `score_taxonomy` | **FROM SHARED LIBRARY**: `kalimantanbio_shared::taxonomy::calculate_taxonomy_similarity` | Menghitung skor taksonomi (0.0–1.0) berdasarkan level takson tertinggi yang sama. Skala dan formula ada di shared library. |
+| `score_conservation` | `fn score_conservation(a: &Species, b: &Species) -> f64` | **MODULE-SPECIFIC**: Menghitung rata-rata kesamaan tiga atribut konservasi (`iucn`, `cites`, `p106`). Tiap atribut: 1.0 jika identik, 0.5 jika salah satu bernilai `"-"`, 0.0 jika berbeda. Rata-rata dari ketiga nilai. |
+| `score_species_type` | `fn score_species_type(a: &Species, b: &Species) -> f64` | **MODULE-SPECIFIC**: Mengembalikan 1.0 jika `species_type` identik (case-insensitive), 0.0 jika berbeda. |
+| `score_distribution` | **FROM SHARED LIBRARY**: `kalimantanbio_shared::collections::jaccard_similarity` | Menghitung Jaccard Similarity dari set kabupaten observasi: `\|intersection\| / \|union\|`. Mengembalikan 0.0 jika salah satu atau keduanya kosong (menghindari division by zero). |
+| `calculate_similarity_score` | **Uses SHARED `combine_weighted_scores`**: `fn calculate_similarity_score(a: &Species, b: &Species, obs_a: &std::collections::HashSet<u64>, obs_b: &std::collections::HashSet<u64>, weights: &ScoringWeights) -> SimilarityScore` | Menggabungkan keempat skor dengan bobot dari `weights` menjadi `total_score` menggunakan shared library. |
+| `calculate_all_pairs` | `fn calculate_all_pairs(species_list: &[&Species], observations_map: &std::collections::HashMap<u64, std::collections::HashSet<u64>>, weights: &ScoringWeights) -> Vec<SimilarityScore>` | **MODULE-SPECIFIC**: Menghasilkan semua kombinasi pasang spesies (n*(n-1)/2) dan menghitung skor tiap pasang. Menggunakan nested iterator dengan `.enumerate().flat_map()`. |
+| `find_most_similar` | **Uses SHARED `rank_by_score` / `top_n`**: `fn find_most_similar(target_id: u64, scores: &[SimilarityScore]) -> Option<SimilarityScore>` | Menemukan pasang dengan `total_score` tertinggi yang melibatkan `target_id` menggunakan `rank_by_score`/`max_by`. Mengembalikan `None` jika tidak ada pasang yang ditemukan. |
 
 **Person in Charge:** **(isi nama anggota)**
 
 ---
 
-## 7. Tahap 5 — Summary Generation & Integration Pipeline
+## 8. Tahap 5 — Summary Generation & Integration Pipeline
 
-Menggabungkan seluruh output tahap sebelumnya menjadi `ComparisonResult` lengkap dan menghasilkan ringkasan teks yang menjelaskan persamaan dan perbedaan utama antarspesies.
+Menggabungkan seluruh output tahap sebelumnya menjadi `ComparisonResult` lengkap dan menghasilkan ringkasan teks yang menjelaskan persamaan dan perbedaan utama antarspesies. Data spesies dan observasi dibaca dari production database melalui shared library.
 
 | Fungsi / Komponen | Signature / Bentuk | Deskripsi |
 | ----------------- | ------------------ | ----------- |
-| `generate_summary` | `fn generate_summary(result: &ComparisonResult) -> String` | Menghasilkan ringkasan teks perbandingan dari `shared_attributes`, `unique_attributes`, `distinguishing_characteristics`, dan `similarity_scores` tertinggi. Pure function, tidak melakukan I/O. |
-| `compare_species` | `fn compare_species(query: &ComparisonQuery, all_species: &[Species], all_observations: &[Observation], weights: &ScoringWeights) -> Result<ComparisonResult, ComparisonError>` | Entry point pipeline utama: merangkai Tahap 1–4 menjadi `ComparisonResult` lengkap. |
+| `generate_summary` | `fn generate_summary(result: &ComparisonResult) -> String` | **MODULE-SPECIFIC**: Menghasilkan ringkasan teks perbandingan dari `shared_attributes`, `unique_attributes`, `distinguishing_characteristics`, dan `similarity_scores` tertinggi. Pure function, tidak melakukan I/O. |
+| `compare_species` | `fn compare_species(query: &ComparisonQuery, all_species: &[Species], all_observations: &[Observation], weights: &ScoringWeights) -> Result<ComparisonResult, ComparisonError>` | **MODULE ENTRY POINT**: Entry point pipeline utama: merangkai Tahap 1–4 menjadi `ComparisonResult` lengkap. |
+| `fetch_all_species` | **FROM SHARED LIBRARY**: `kalimantanbio_shared::db::fetch_all_species` | Fetch semua spesies dari production database. |
+| `fetch_observations_for_species` | **FROM SHARED LIBRARY**: `kalimantanbio_shared::db::fetch_observations_for_species` | Fetch observasi per spesies dari production database. |
 | Unit Tests | `mod tests { ... }` | Menguji setiap fungsi dari Tahap 1–4 secara independen menggunakan data dummy `Vec<Species>` dan `Vec<Observation>`. |
 | Pipeline Validation | `cargo test` | Menjalankan seluruh skenario pengujian secara otomatis termasuk edge cases. |
 
@@ -246,18 +338,24 @@ Menggabungkan seluruh output tahap sebelumnya menjadi `ComparisonResult` lengkap
 
 ---
 
-## 8. Komposisi Pipeline Utama
+## 9. Komposisi Pipeline Utama
 
 Setelah seluruh tahap tersedia, fungsi utama modul menggabungkan proses menjadi satu pipeline.
 
 ```rust
+use kalimantanbio_shared::{
+    taxonomy::calculate_taxonomy_similarity,
+    collections::jaccard_similarity,
+    scoring::combine_weighted_scores,
+};
+
 fn compare_species(
     query: &ComparisonQuery,
     all_species: &[Species],
     all_observations: &[Observation],
     weights: &ScoringWeights,
 ) -> Result<ComparisonResult, ComparisonError> {
-    validate_query(query)?;
+    validate_query(query)?;   // module-specific wrapper (uses SHARED validate_id_list)
     let species_list = fetch_species_by_ids(&query.species_ids, all_species)?;
     let observations_map: HashMap<u64, HashSet<u64>> = species_list
         .iter()
@@ -309,11 +407,11 @@ ComparisonQuery (species_ids)
 ComparisonResult (output lengkap)
 ```
 
-Fungsi `compare_species` adalah **entry point** modul dan menjadi contoh penerapan **function composition** — menggabungkan beberapa fungsi kecil bertanggung jawab spesifik menjadi satu proses besar.
+Fungsi `compare_species` adalah **entry point** modul dan menjadi contoh penerapan **function composition** — menggabungkan fungsi-fungsi shared library dan fungsi module-specific menjadi satu proses besar.
 
 ---
 
-## 9. Prinsip Functional Programming yang Perlu Dipegang Tim
+## 10. Prinsip Functional Programming yang Perlu Dipegang Tim
 
 ### Pure Functions
 
@@ -370,15 +468,17 @@ Setiap fungsi sebaiknya memiliki satu tanggung jawab yang jelas dan dapat diuji 
 
 ---
 
-## 10. Pembagian Kerja — 5 Anggota
+## 11. Pembagian Kerja — 5 Anggota
 
 | # | Tahap | Fungsi / Tanggung Jawab Utama | PIC | Status |
 | - | --------- | ------------------------------------- | --- | ------------- |
-| 1 | Tahap 1: Data Retrieval & Validation | `validate_query`, `fetch_species_by_ids`, `fetch_observations_for_species`, `build_kabupaten_set` | | Belum dimulai |
-| 2 | Tahap 2: Attribute Matrix Construction | `build_taxonomy_path`, `build_attribute_row`, `build_attribute_matrix`, `extract_attribute_values` | | Belum dimulai |
+| 1 | Tahap 1: Data Retrieval & Validation | `validate_query` (via shared `validate_id_list`), `fetch_species_by_ids`, `build_kabupaten_set` (data via shared `fetch_all_species`) | | Belum dimulai |
+| 2 | Tahap 2: Attribute Matrix Construction | `build_attribute_row`, `build_attribute_matrix`, `extract_attribute_values` (taxonomy path via shared `build_taxonomy_path`) | | Belum dimulai |
 | 3 | Tahap 3: Shared & Unique Attribute Analysis | `is_attribute_shared`, `find_shared_attributes`, `find_unique_attributes`, `find_distinguishing_characteristics` | | Belum dimulai |
-| 4 | Tahap 4: Similarity Scoring | `score_taxonomy`, `score_conservation`, `score_species_type`, `score_distribution`, `calculate_similarity_score`, `calculate_all_pairs`, `find_most_similar` | | Belum dimulai |
+| 4 | Tahap 4: Similarity Scoring | `score_conservation`, `score_species_type`, `calculate_all_pairs`, `find_most_similar` (via shared `calculate_taxonomy_similarity`, `jaccard_similarity`, `combine_weighted_scores`) | | Belum dimulai |
 | 5 | Tahap 5: Integration & Testing | `generate_summary`, `compare_species`, unit tests, pipeline validation | | Belum dimulai |
+
+> **Catatan:** Fungsi `build_taxonomy_path`, `calculate_taxonomy_similarity`, `jaccard_similarity`, `combine_weighted_scores`, `rank_by_score`, `validate_id_list`, `fetch_all_species`, dan `fetch_observations_for_species` berasal dari **shared library** (`kalimantanbio-shared`) dan **tidak perlu diimplementasikan** di modul ini.
 
 ### Pembagian Tanggung Jawab
 
@@ -392,64 +492,64 @@ Setiap PIC bertanggung jawab terhadap:
 
 ---
 
-## 11. Kesepakatan Antaranggota
+## 12. Kesepakatan Antaranggota
 
 Sebelum implementasi dimulai, seluruh anggota perlu menyepakati:
 
-* Struktur `Species`, `Taxonomy`, `Observation`, `ComparisonQuery`, `ScoringWeights`, `SimilarityScore`, dan `ComparisonResult`.
+* Struktur `Species`, `Taxonomy`, `Observation` (dari shared library) serta tipe module-specific `ComparisonQuery`, `ScoringWeights`, `SimilarityScore`, dan `ComparisonResult`.
 * Arti setiap field, terutama field yang berasal dari singkatan (`iucn`, `cites`, `p106`).
 * Jumlah maksimal spesies yang dapat dibandingkan sekaligus dalam satu `ComparisonQuery`.
 * Input dan output setiap fungsi, termasuk format string `shared_attributes` dan `unique_attributes`.
 * Function signature final untuk setiap tahap.
 * Formula dan bobot scoring pada `ScoringWeights` (default: taxonomy=0.40, conservation=0.30, type=0.15, distribution=0.15).
-* Formula `score_taxonomy`: level takson yang sama (genus=1.0, family=0.8, order=0.6, class=0.4, phylum=0.2, kingdom=0.1).
-* Formula `score_distribution`: Jaccard Similarity dari set kabupaten observasi.
+* Formula `score_taxonomy` menggunakan shared library (`calculate_taxonomy_similarity`).
+* Formula `score_distribution`: Jaccard Similarity dari set kabupaten observasi (shared library).
 * Format `shared_attributes` (mis. `"iucn=CR"`) dan `unique_attributes` (mis. `"123:species_type=Endemic"`).
 * Format output `summary` (teks bebas atau template terstruktur).
-* Strategi testing (unit test per fungsi dengan data dummy, tanpa koneksi API aktif).
+* Strategi testing (unit test per fungsi dengan data dummy, tanpa koneksi DB aktif).
 
 Tujuannya adalah memastikan fungsi yang dikembangkan oleh anggota berbeda tetap dapat dikombinasikan tanpa perubahan besar pada interface masing-masing.
 
 ---
 
-## 12. Independensi Modul
+## 13. Independensi Modul
 
 Modul ini dikembangkan sebagai komponen independen dalam KalimantanBio.
 
 Prinsip yang digunakan:
 
 * Modul dapat dikembangkan secara mandiri, terlepas dari status Modul 1, 2, 3, dan 5.
-* Modul dapat diuji secara mandiri menggunakan data dummy `Vec<Species>` dan `Vec<Observation>`, tanpa harus terkoneksi ke API.
-* Modul tidak boleh bergantung pada implementasi internal modul lain.
+* Modul dapat diuji secara mandiri menggunakan data dummy `Vec<Species>` dan `Vec<Observation>`, tanpa harus terkoneksi ke database.
+* Modul hanya bergantung pada **shared library** (`kalimantanbio-shared`) untuk tipe data dan fungsi umum.
 * Gunakan shared concepts (`Species`, `Taxonomy`) sebagai data convention yang disetujui bersama.
 * Integrasi dengan modul lain bersifat opsional — misalnya hasil pencarian Modul 1 dapat digunakan sebagai input `species_ids` ke Modul 4.
 * Jangan mengasumsikan dependency terhadap modul lain tanpa kebutuhan teknis yang jelas.
 
 ```text
-              KalimantanBio
-                   |
-          .------.-.------.
-          |       |        |
-         M1      M2       M3
-          |       |        |
-         M4      M5
-          |       |
-          .-------.---------.
-                            |
-                    Optional Integration
+          KalimantanBio
+               │
+               │  ((shared))  kalimantanbio-shared
+               │
+          ┌────┴────┐
+          │         │
+     Modul ini    Modul lain
+       (M4)       (M1, M2, M3, M5)
 ```
+
+Modul ini (M4) hanya bergantung pada shared library, bukan pada modul lain.
 
 Diagram di atas menggambarkan hubungan **konseptual**, bukan dependency teknis.
 
 ---
 
-## 13. Kriteria Selesai Modul
+## 14. Kriteria Selesai Modul
 
 Modul dianggap siap untuk tahap akhir apabila:
 
 * [ ] Seluruh fungsi utama telah diimplementasikan.
+* [ ] Fungsi-fungsi dari **shared library** digunakan, bukan diduplikasi.
 * [ ] Setiap fungsi memiliki unit test yang relevan.
-* [ ] Pipeline `compare_species()` dapat berjalan end-to-end dengan data dummy maupun data dari API.
+* [ ] Pipeline `compare_species()` dapat berjalan end-to-end dengan data dummy maupun data dari database (melalui shared library).
 * [ ] Input `ComparisonQuery` dapat diproses sesuai spesifikasi, termasuk validasi jumlah spesies.
 * [ ] Output menghasilkan `ComparisonResult` dengan semua field terisi sesuai format yang disepakati.
 * [ ] `SimilarityScore` menghasilkan nilai dalam rentang 0.0-1.0 untuk semua dimensi dan total skor.
@@ -457,11 +557,11 @@ Modul dianggap siap untuk tahap akhir apabila:
 * [ ] Tidak terdapat state global yang tidak diperlukan.
 * [ ] Dokumentasi fungsi dan struktur data tersedia.
 * [ ] Terdapat demonstrasi penggunaan modul (contoh query dengan 2-3 spesies dan hasilnya).
-* [ ] Modul dapat dijalankan secara independen, termasuk fallback jika API tidak tersedia.
+* [ ] Modul dapat dijalankan secara independen.
 
 ---
 
-## 14. Contoh Skenario Pengujian
+## 15. Contoh Skenario Pengujian
 
 ### Skenario 1 — Membandingkan Dua Spesies Orangutan
 
@@ -505,11 +605,11 @@ ComparisonResult {
 
 **Fungsi yang diuji:**
 
-* `validate_query`, `fetch_species_by_ids`
-* `build_taxonomy_path`, `build_attribute_matrix`
+* `validate_query` (via `validate_id_list` shared), `fetch_species_by_ids`
+* `build_attribute_row` (via `build_taxonomy_path` shared), `build_attribute_matrix`
 * `find_shared_attributes`, `find_unique_attributes`, `find_distinguishing_characteristics`
-* `score_taxonomy`, `score_conservation`, `score_species_type`, `score_distribution`
-* `calculate_similarity_score`, `generate_summary`
+* `score_conservation`, `score_species_type`
+* `calculate_similarity_score` (via `calculate_taxonomy_similarity`, `jaccard_similarity`, `combine_weighted_scores` shared), `generate_summary`
 
 ---
 
@@ -592,20 +692,20 @@ Some(SimilarityScore { ... total_score: <nilai tertinggi yang melibatkan id=1> }
 
 ---
 
-## 15. Langkah Selanjutnya
+## 16. Langkah Selanjutnya
 
-1. Finalisasi domain model bersama seluruh anggota (`Species`, `Taxonomy`, `Observation`, `ScoringWeights`, dan semua struct terkait).
-2. Sepakati nilai default bobot scoring dan formula untuk setiap dimensi skor.
-3. Sepakati batas maksimal spesies yang dapat dibandingkan sekaligus dalam satu `ComparisonQuery`.
-4. Sepakati format string untuk `shared_attributes`, `unique_attributes`, dan `distinguishing_characteristics`.
-5. Konfirmasi field `Species` yang akan digunakan (pastikan sesuai dengan response aktual `kalimantan-bio-demo-api`).
-6. Tentukan pembagian fungsi berdasarkan PIC (isi tabel Bagian 10).
+1. Verifikasi bahwa **shared library** (`kalimantanbio-shared`) sudah tersedia; jika belum, blokir pengerjaan sampai siap.
+2. Finalisasi domain model bersama project lead (tipe `Species`, `Taxonomy`, `Observation` sudah standar).
+3. Sepakati nilai default bobot scoring dan formula untuk setiap dimensi skor.
+4. Sepakati batas maksimal spesies yang dapat dibandingkan sekaligus dalam satu `ComparisonQuery`.
+5. Sepakati format string untuk `shared_attributes`, `unique_attributes`, dan `distinguishing_characteristics`.
+6. Tentukan pembagian fungsi berdasarkan PIC (isi tabel Bagian 11).
 7. Setiap PIC membuat signature dan dokumentasi singkat fungsi masing-masing.
 8. Review interface bersama sebelum implementasi logic dimulai.
-9. Siapkan data dummy `Vec<Species>` dan `Vec<Observation>` (independen dari API) untuk unit test.
-10. Implementasikan fungsi secara paralel sesuai pembagian kerja.
+9. Siapkan data dummy `Vec<Species>` dan `Vec<Observation>` (independen dari DB) untuk unit test.
+10. Implementasikan fungsi secara paralel sesuai pembagian kerja; gunakan fungsi shared library.
 11. Setiap PIC membuat unit test untuk fungsi masing-masing.
 12. Gabungkan seluruh tahap ke dalam pipeline `compare_species()`.
-13. Lakukan pengujian end-to-end menggunakan data dummy dan kemudian data dari API.
+13. Lakukan pengujian end-to-end menggunakan data dummy dan kemudian data production (via shared library).
 14. Dokumentasikan hasil dan contoh penggunaan modul.
 15. Review akhir sebelum modul dianggap selesai.

@@ -4,11 +4,12 @@
 **Bahasa:** Rust  
 **Cakupan:** Eksplorasi publikasi ilmiah, topik riset, lokasi penelitian, timeline riset, coverage analysis, dan rekomendasi sitasi biodiversitas Kalimantan.
 
-**Repository:** `kalimantanbio-modul5-knowledge-citation`
+**Repository:** Part of KalimantanBio monorepo workspace (`crates/knowledge-citations`)  
+**API Integration:** Production KalimantanBio API (PostgreSQL via shared library)
 
-**Sumber data:** `kalimantan-bio-demo-api` dan dataset publikasi ilmiah terstruktur.
+> **PENTING**: Modul ini menggunakan **Shared Library** (`kalimantanbio-shared`) untuk tipe data dan fungsi umum. Lihat [MASTERPLAN.md](../MASTERPLAN.md) untuk arsitektur lengkap.
 
-> Catatan integrasi: API demo saat ini menyediakan data spesies, taksonomi, observasi, lokasi, institusi, dan dataset, tetapi belum menyediakan endpoint publikasi ilmiah. Karena itu, data publikasi pada tahap awal dapat dibaca dari fixture JSON/CSV atau adapter API terpisah. Integrasi endpoint publikasi dapat ditambahkan tanpa mengubah fungsi analitik murni.
+> Catatan integrasi: Production KalimantanBio database menyediakan data spesies, taksonomi, observasi, lokasi, dan institusi. Data publikasi ilmiah pada tahap awal dapat dibaca dari fixture JSON/CSV atau adapter terpisah. Integrasi endpoint publikasi dapat ditambahkan tanpa mengubah fungsi analitik murni.
 
 ---
 
@@ -36,7 +37,54 @@ Modul ini **tidak bertanggung jawab** terhadap:
 
 ---
 
-## 2. Struktur Data (Domain Model)
+## 2. Shared Library Integration
+
+Modul ini menggunakan **shared library** (`kalimantanbio-shared`) untuk tipe data dan fungsi umum yang digunakan bersama dengan modul lain.
+
+### 2.1 Shared Types Used
+
+```rust
+use kalimantanbio_shared::core::Species;
+```
+
+- `Species` - Struktur data lengkap spesies dari production database (untuk mencocokkan publikasi dengan spesies)
+
+### 2.2 Shared Functions Used
+
+#### From `text` module:
+```rust
+use kalimantanbio_shared::text::normalize_text;
+```
+
+- `normalize_text(input: &str) -> String` - Menormalkan teks (trim, huruf kecil, rapikan spasi) untuk pencocokan judul/topik/lokasi
+
+**Digunakan di**: Tahap 1 (Normalization), Tahap 2 (Query Explorer)
+
+#### From `stats` module:
+```rust
+use kalimantanbio_shared::stats::{build_timeline, count_by_key, calculate_coverage_percentage};
+```
+
+- `build_timeline<T>(items: &[T], year_fn: impl Fn(&T) -> u16) -> BTreeMap<u16, usize>` - Menghitung jumlah publikasi per tahun
+- `count_by_key<T, K>(items: &[T], key_fn: impl Fn(&T) -> K) -> HashMap<K, usize>` - Menghitung distribusi berdasarkan topik/lokasi
+- `calculate_coverage_percentage(available: usize, total: usize) -> f64` - Menghitung skor coverage (0.0–1.0)
+
+**Digunakan di**: Tahap 3 (Timeline & Coverage Analysis)
+
+#### From `scoring` module:
+```rust
+use kalimantanbio_shared::scoring::{rank_by_score, filter_by_threshold, top_n};
+```
+
+- `rank_by_score<T>(items: Vec<(T, f64)>) -> Vec<(T, f64)>` - Mengurutkan publikasi berdasarkan skor relevansi
+- `filter_by_threshold<T>(items: Vec<(T, f64)>, threshold: f64) -> Vec<(T, f64)>` - Menyaring di bawah threshold
+- `top_n<T>(items: Vec<(T, f64)>, n: usize) -> Vec<(T, f64)>` - Mengambil N referensi teratas
+
+**Digunakan di**: Tahap 4 (Citation Ranking & Recommendation)
+
+### 2.3 Module-Specific Types
+
+Modul ini mendefinisikan tipe tambahan yang spesifik untuk publikasi dan sitasi:
 
 ```rust
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -57,6 +105,81 @@ struct Publication {
     citation_count: Option<u32>,
 }
 
+#[derive(Debug, Clone, Default)]
+struct PublicationQuery {
+    text: Option<String>,
+    species_id: Option<u64>,
+    taxon_name: Option<String>,
+    topic: Option<ResearchTopic>,
+    location: Option<String>,
+    year_from: Option<u16>,
+    year_to: Option<u16>,
+    source_type: Option<SourceType>,
+}
+
+#[derive(Debug, Clone, Default)]
+struct CoverageRecord {
+    entity_name: String,
+    publication_count: usize,
+    species_count: usize,
+    first_year: Option<u16>,
+    latest_year: Option<u16>,
+}
+```
+
+(Struktur `Author`, `ProfessionalLocation`, `ResearchTopic`, `SourceType`, dan `LocationType` tetap didefinisikan di modul ini — lihat Bagian 3.)
+
+### 2.4 Cargo.toml Dependency
+
+```toml
+[dependencies]
+kalimantanbio-shared = { path = "../shared" }
+serde = { workspace = true }
+tokio = { workspace = true }
+```
+
+### 2.5 Integration Example
+
+```rust
+use kalimantanbio_shared::{
+    text::normalize_text,
+    stats::{build_timeline, count_by_key, calculate_coverage_percentage},
+    scoring::{rank_by_score, top_n},
+};
+
+pub fn analyze_timeline(items: &[Publication]) -> BTreeMap<u16, usize> {
+    // Gunakan shared library untuk timeline
+    build_timeline(items, |p| p.publication_year)
+}
+
+pub fn analyze_topic_distribution(items: &[Publication]) -> HashMap<ResearchTopic, usize> {
+    // Gunakan shared library untuk counting
+    count_by_key(items, |p| p.topics.first().cloned().unwrap_or_default())
+}
+
+pub fn rank_citations<'a>(
+    items: &[&'a Publication],
+    query: &PublicationQuery,
+    limit: usize,
+) -> Vec<&'a Publication> {
+    let scored: Vec<(&Publication, f64)> = items
+        .iter()
+        .map(|p| (**p, score_publication_relevance(p, query)))
+        .collect();
+
+    // Gunakan shared library untuk ranking dan limit
+    let ranked = rank_by_score(scored.into_iter().map(|(p, s)| (p, s)).collect());
+    top_n(ranked, limit).into_iter().map(|(p, _)| p).collect()
+}
+```
+
+---
+
+## 3. Struktur Data (Domain Model)
+
+Struktur data tambahan yang spesifik untuk Modul 5 (selain tipe di Bagian 2.3):
+
+```rust
 #[derive(Debug, Clone, serde::Deserialize)]
 struct Author {
     id: Option<String>,
@@ -101,28 +224,9 @@ enum LocationType {
     ConservationArea,
     Other(String),
 }
-
-#[derive(Debug, Clone, Default)]
-struct PublicationQuery {
-    text: Option<String>,
-    species_id: Option<u64>,
-    taxon_name: Option<String>,
-    topic: Option<ResearchTopic>,
-    location: Option<String>,
-    year_from: Option<u16>,
-    year_to: Option<u16>,
-    source_type: Option<SourceType>,
-}
-
-#[derive(Debug, Clone, Default)]
-struct CoverageRecord {
-    entity_name: String,
-    publication_count: usize,
-    species_count: usize,
-    first_year: Option<u16>,
-    latest_year: Option<u16>,
-}
 ```
+
+> **Catatan:** Tipe `Species` sudah distandardisasi di shared library. Tipe `Publication`, `Author`, `ResearchTopic`, `ResearchLocation`, dan enum terkait bersifat spesifik untuk Modul 5.
 
 ### Data yang Digunakan
 
@@ -138,50 +242,54 @@ struct CoverageRecord {
 
 ---
 
-## 3. Tahap 1 - Data Ingestion, Normalization & Validation
+## 4. Tahap 1 - Data Ingestion, Normalization & Validation
 
 Membaca data publikasi dari JSON/CSV/API, menormalisasi metadata, dan menghapus atau menandai record yang tidak valid.
 
+> **Catatan**: Fungsi `normalize_text` menggunakan **shared library**.
+
 | Fungsi | Signature | Deskripsi |
 | --- | --- | --- |
-| `parse_publications` | `fn parse_publications(raw: &str) -> Result<Vec<Publication>, ParseError>` | Mendeserialisasi input publikasi terstruktur. |
-| `normalize_publication` | `fn normalize_publication(publication: Publication) -> Publication` | Menormalkan judul, DOI, nama penulis, topik, dan lokasi. |
-| `validate_publication` | `fn validate_publication(publication: &Publication) -> Result<(), ValidationError>` | Memeriksa ID, judul, tahun, dan metadata minimum. |
-| `deduplicate_publications` | `fn deduplicate_publications(items: &[Publication]) -> Vec<Publication>` | Menghapus duplikasi berdasarkan ID, DOI, atau fingerprint judul. |
-| `build_species_index` | `fn build_species_index(items: &[Publication]) -> HashMap<u64, Vec<String>>` | Membuat indeks spesies ke ID publikasi. |
+| `parse_publications` | `fn parse_publications(raw: &str) -> Result<Vec<Publication>, ParseError>` | **MODULE-SPECIFIC**: Mendeserialisasi input publikasi terstruktur. |
+| `normalize_publication` | `fn normalize_publication(publication: Publication) -> Publication` | **Uses SHARED `normalize_text`**: Menormalkan judul, DOI, nama penulis, topik, dan lokasi. |
+| `validate_publication` | `fn validate_publication(publication: &Publication) -> Result<(), ValidationError>` | **MODULE-SPECIFIC**: Memeriksa ID, judul, tahun, dan metadata minimum. |
+| `deduplicate_publications` | `fn deduplicate_publications(items: &[Publication]) -> Vec<Publication>` | **MODULE-SPECIFIC**: Menghapus duplikasi berdasarkan ID, DOI, atau fingerprint judul. |
+| `build_species_index` | `fn build_species_index(items: &[Publication]) -> HashMap<u64, Vec<String>>` | **MODULE-SPECIFIC**: Membuat indeks spesies ke ID publikasi. |
 
 **Person in Charge:** **[Nama anggota]**
 
 ---
 
-## 4. Tahap 2 - Species, Topic & Location Explorer
+## 5. Tahap 2 - Species, Topic & Location Explorer
 
 Menyediakan query murni untuk menemukan publikasi berdasarkan spesies, topik, lokasi, dan kombinasi filter.
 
 | Fungsi | Signature | Deskripsi |
 | --- | --- | --- |
-| `publications_for_species` | `fn publications_for_species<'a>(items: &'a [Publication], species_id: u64) -> Vec<&'a Publication>` | Mengambil publikasi yang terkait dengan spesies. |
-| `publications_for_taxon` | `fn publications_for_taxon<'a>(items: &'a [Publication], taxon: &str) -> Vec<&'a Publication>` | Mencari publikasi berdasarkan nama genus/famili/takson. |
-| `publications_for_topic` | `fn publications_for_topic<'a>(items: &'a [Publication], topic: &ResearchTopic) -> Vec<&'a Publication>` | Memfilter publikasi berdasarkan topik riset. |
-| `publications_for_location` | `fn publications_for_location<'a>(items: &'a [Publication], location: &str) -> Vec<&'a Publication>` | Memfilter publikasi berdasarkan lokasi studi. |
-| `query_publications` | `fn query_publications<'a>(items: &'a [Publication], query: &PublicationQuery) -> Vec<&'a Publication>` | Menggabungkan seluruh filter query menggunakan iterator predicates. |
+| `publications_for_species` | `fn publications_for_species<'a>(items: &'a [Publication], species_id: u64) -> Vec<&'a Publication>` | **MODULE-SPECIFIC**: Mengambil publikasi yang terkait dengan spesies. |
+| `publications_for_taxon` | `fn publications_for_taxon<'a>(items: &'a [Publication], taxon: &str) -> Vec<&'a Publication>` | **MODULE-SPECIFIC**: Mencari publikasi berdasarkan nama genus/famili/takson. |
+| `publications_for_topic` | `fn publications_for_topic<'a>(items: &'a [Publication], topic: &ResearchTopic) -> Vec<&'a Publication>` | **MODULE-SPECIFIC**: Memfilter publikasi berdasarkan topik riset. |
+| `publications_for_location` | `fn publications_for_location<'a>(items: &'a [Publication], location: &str) -> Vec<&'a Publication>` | **MODULE-SPECIFIC**: Memfilter publikasi berdasarkan lokasi studi. |
+| `query_publications` | `fn query_publications<'a>(items: &'a [Publication], query: &PublicationQuery) -> Vec<&'a Publication>` | **MODULE-SPECIFIC**: Menggabungkan seluruh filter query menggunakan iterator predicates. |
 
 **Person in Charge:** **[Nama anggota]**
 
 ---
 
-## 5. Tahap 3 - Timeline & Research Coverage Analysis
+## 6. Tahap 3 - Timeline & Research Coverage Analysis
 
 Mengubah kumpulan publikasi menjadi statistik perkembangan dan cakupan penelitian.
 
+> **Catatan**: Fungsi `build_timeline`, `count_by_key`, dan `calculate_coverage_percentage` menggunakan **shared library**.
+
 | Fungsi | Signature | Deskripsi |
 | --- | --- | --- |
-| `build_research_timeline` | `fn build_research_timeline(items: &[Publication]) -> BTreeMap<u16, usize>` | Menghitung jumlah publikasi per tahun. |
-| `calculate_topic_distribution` | `fn calculate_topic_distribution(items: &[Publication]) -> HashMap<ResearchTopic, usize>` | Menghitung distribusi publikasi berdasarkan topik. |
-| `calculate_location_distribution` | `fn calculate_location_distribution(items: &[Publication]) -> HashMap<String, usize>` | Menghitung jumlah publikasi per lokasi. |
-| `calculate_entity_coverage` | `fn calculate_entity_coverage(items: &[Publication], species_ids: &[u64]) -> Vec<CoverageRecord>` | Membandingkan jumlah publikasi antarspesies. |
-| `find_understudied_species` | `fn find_understudied_species(coverage: &[CoverageRecord], threshold: usize) -> Vec<&CoverageRecord>` | Menemukan spesies dengan jumlah publikasi di bawah threshold. |
-| `calculate_coverage_score` | `fn calculate_coverage_score(published: usize, expected: usize) -> f64` | Menghasilkan skor coverage dalam rentang 0.0 hingga 1.0. |
+| `build_research_timeline` | **FROM SHARED LIBRARY**: `kalimantanbio_shared::stats::build_timeline` | Menghitung jumlah publikasi per tahun. |
+| `calculate_topic_distribution` | **Uses SHARED `count_by_key`**: `fn calculate_topic_distribution(items: &[Publication]) -> HashMap<ResearchTopic, usize>` | Menghitung distribusi publikasi berdasarkan topik. |
+| `calculate_location_distribution` | **Uses SHARED `count_by_key`**: `fn calculate_location_distribution(items: &[Publication]) -> HashMap<String, usize>` | Menghitung jumlah publikasi per lokasi. |
+| `calculate_entity_coverage` | `fn calculate_entity_coverage(items: &[Publication], species_ids: &[u64]) -> Vec<CoverageRecord>` | **MODULE-SPECIFIC**: Membandingkan jumlah publikasi antarspesies. |
+| `find_understudied_species` | **Uses SHARED `filter_by_threshold`**: `fn find_understudied_species(coverage: &[CoverageRecord], threshold: usize) -> Vec<&CoverageRecord>` | Menemukan spesies dengan jumlah publikasi di bawah threshold. |
+| `calculate_coverage_score` | **FROM SHARED LIBRARY**: `kalimantanbio_shared::stats::calculate_coverage_percentage` | Menghasilkan skor coverage dalam rentang 0.0 hingga 1.0. |
 
 **Person in Charge:** **[Nama anggota]**
 
@@ -189,18 +297,20 @@ Mengubah kumpulan publikasi menjadi statistik perkembangan dan cakupan penelitia
 
 ---
 
-## 6. Tahap 4 - Citation Ranking, Recommendation & Export
+## 7. Tahap 4 - Citation Ranking, Recommendation & Export
 
 Mengurutkan referensi yang paling relevan dan menghasilkan format sitasi yang dapat digunakan dalam tulisan akademik.
 
+> **Catatan**: Fungsi `rank_by_score`, `filter_by_threshold`, dan `top_n` menggunakan **shared library**.
+
 | Fungsi | Signature | Deskripsi |
 | --- | --- | --- |
-| `score_publication_relevance` | `fn score_publication_relevance(publication: &Publication, query: &PublicationQuery) -> f64` | Menghitung skor berdasarkan kecocokan spesies, topik, lokasi, tahun, dan teks. |
-| `rank_publications` | `fn rank_publications<'a>(items: &[&'a Publication], query: &PublicationQuery) -> Vec<(&'a Publication, f64)>` | Mengurutkan publikasi berdasarkan skor relevansi. |
-| `recommend_citations` | `fn recommend_citations<'a>(items: &'a [Publication], query: &PublicationQuery, limit: usize) -> Vec<&'a Publication>` | Menghasilkan rekomendasi referensi teratas. |
-| `format_apa` | `fn format_apa(publication: &Publication) -> String` | Mengekspor satu publikasi ke format APA sederhana. |
-| `format_bibtex` | `fn format_bibtex(publication: &Publication) -> String` | Mengekspor satu publikasi ke format BibTeX. |
-| `export_citations` | `fn export_citations(items: &[Publication], format: CitationFormat) -> String` | Menghasilkan kumpulan sitasi dalam format yang dipilih. |
+| `score_publication_relevance` | `fn score_publication_relevance(publication: &Publication, query: &PublicationQuery) -> f64` | **MODULE-SPECIFIC**: Menghitung skor berdasarkan kecocokan spesies, topik, lokasi, tahun, dan teks. |
+| `rank_publications` | **Uses SHARED `rank_by_score`**: `fn rank_publications<'a>(items: &[&'a Publication], query: &PublicationQuery) -> Vec<(&'a Publication, f64)>` | Mengurutkan publikasi berdasarkan skor relevansi. |
+| `recommend_citations` | **Uses SHARED `top_n`**: `fn recommend_citations<'a>(items: &'a [Publication], query: &PublicationQuery, limit: usize) -> Vec<&'a Publication>` | Menghasilkan rekomendasi referensi teratas. |
+| `format_apa` | `fn format_apa(publication: &Publication) -> String` | **MODULE-SPECIFIC**: Mengekspor satu publikasi ke format APA sederhana. |
+| `format_bibtex` | `fn format_bibtex(publication: &Publication) -> String` | **MODULE-SPECIFIC**: Mengekspor satu publikasi ke format BibTeX. |
+| `export_citations` | `fn export_citations(items: &[Publication], format: CitationFormat) -> String` | **MODULE-SPECIFIC**: Menghasilkan kumpulan sitasi dalam format yang dipilih. |
 
 **Person in Charge:** **[Nama anggota]**
 
@@ -208,7 +318,7 @@ Mengurutkan referensi yang paling relevan dan menghasilkan format sitasi yang da
 
 ---
 
-## 7. Tahap 5 - Knowledge Network & Integrasi
+## 8. Tahap 5 - Knowledge Network & Integrasi
 
 Membangun representasi relasi antarspesies, publikasi, topik, lokasi, dan peneliti, lalu menguji seluruh pipeline.
 
@@ -234,9 +344,15 @@ Species ---- discussed_in ---- Publication ---- written_by ---- Researcher
 
 ---
 
-## 8. Komposisi Pipeline Utama
+## 9. Komposisi Pipeline Utama
 
 ```rust
+use kalimantanbio_shared::{
+    text::normalize_text,
+    stats::{build_timeline, count_by_key, calculate_coverage_percentage},
+    scoring::{rank_by_score, top_n},
+};
+
 fn explore_knowledge(input: &KnowledgeInput) -> Result<KnowledgeReport, PipelineError> {
     let parsed = parse_publications(&input.raw_publications)?;
     let normalized = parsed
@@ -284,7 +400,7 @@ Fungsi `explore_knowledge` menjadi entry point modul dan menggabungkan fungsi-fu
 
 ---
 
-## 9. Prinsip Functional Programming yang Perlu Dipegang Tim
+## 10. Prinsip Functional Programming yang Perlu Dipegang Tim
 
 ### Pure Functions
 
@@ -308,23 +424,29 @@ parse → normalize → deduplicate → query → analyze → rank → export
 
 Setiap tahap harus dapat diuji tanpa harus menjalankan database atau service eksternal.
 
+### Shared Functions adalah Pure Functions
+
+Fungsi dari shared library (`normalize_text`, `build_timeline`, `count_by_key`, `calculate_coverage_percentage`, `rank_by_score`, `filter_by_threshold`, `top_n`) adalah **pure functions** yang diuji satu kali di library. Modul ini cukup memanggil dan memesan komposisinya, tanpa mengubah implementasinya.
+
 ---
 
-## 10. Pembagian Kerja - 5 Anggota
+## 11. Pembagian Kerja - 5 Anggota
 
 | # | Tahap | Fungsi / Tanggung Jawab Utama | PIC | Status |
 | --- | --- | --- | --- | --- |
-| 1 | Ingestion & Validation | `parse_publications`, `normalize_publication`, `deduplicate_publications` | | Belum dimulai |
+| 1 | Ingestion & Validation | `parse_publications`, `normalize_publication`, `deduplicate_publications` (via shared `normalize_text`) | | Belum dimulai |
 | 2 | Explorers | Query spesies, takson, topik, dan lokasi | | Belum dimulai |
-| 3 | Timeline & Coverage | Timeline, distribusi, coverage, understudied explorer | | Belum dimulai |
-| 4 | Citation | Ranking, recommendation, APA, BibTeX export | | Belum dimulai |
+| 3 | Timeline & Coverage | Timeline, distribusi, coverage, understudied explorer (via shared `build_timeline`, `count_by_key`, `calculate_coverage_percentage`) | | Belum dimulai |
+| 4 | Citation | Ranking, recommendation, APA, BibTeX export (via shared `rank_by_score`, `top_n`) | | Belum dimulai |
 | 5 | Integration | Knowledge graph, adapter API, pipeline, integration tests | | Belum dimulai |
+
+> **Catatan:** Fungsi `normalize_text`, `build_timeline`, `count_by_key`, `calculate_coverage_percentage`, `rank_by_score`, `filter_by_threshold`, dan `top_n` berasal dari **shared library** (`kalimantanbio-shared`) dan **tidak perlu diimplementasikan** di modul ini.
 
 Setiap PIC bertanggung jawab terhadap implementasi, unit test, dokumentasi, dan menjaga signature yang telah disepakati.
 
 ---
 
-## 11. Kesepakatan Antaranggota
+## 12. Kesepakatan Antaranggota
 
 Sebelum implementasi dimulai, seluruh anggota perlu menyepakati:
 
@@ -341,7 +463,19 @@ Sebelum implementasi dimulai, seluruh anggota perlu menyepakati:
 
 ---
 
-## 12. Kriteria Selesai Modul
+## 13. Independensi Modul
+
+Modul ini dikembangkan sebagai komponen independen dalam KalimantanBio.
+
+Prinsip yang digunakan:
+
+* Modul dapat dikembangkan dan diuji secara mandiri menggunakan fixture publikasi.
+* Modul hanya bergantung pada **shared library** (`kalimantanbio-shared`) untuk tipe data (`Species`) dan fungsi umum (`normalize_text`, `build_timeline`, `count_by_key`, `calculate_coverage_percentage`, `rank_by_score`).
+* Publikasi ilmiah dimodelkan sebagai data milik modul ini; `Species` dari shared library digunakan untuk mencocokkan publikasi dengan spesies.
+* Tidak ada ketergantungan pada implementasi internal Modul 1, 2, 3, atau 4.
+* Integrasi dengan modul lain bersifat opsional dan dilakukan melalui interface yang telah disepakati.
+
+## 14. Kriteria Selesai Modul
 
 * [ ] Data publikasi dapat diparse dari fixture lokal.
 * [ ] Data publikasi tervalidasi, dinormalisasi, dan dideduplikasi.
@@ -360,7 +494,7 @@ Sebelum implementasi dimulai, seluruh anggota perlu menyepakati:
 
 ---
 
-## 13. Contoh Skenario Pengujian
+## 15. Contoh Skenario Pengujian
 
 ### Skenario 1 - Species-to-Publication Explorer
 
@@ -397,3 +531,24 @@ Sebelum implementasi dimulai, seluruh anggota perlu menyepakati:
 **Input:** dua publikasi yang memiliki spesies atau topik yang sama.
 
 **Expected:** graph memiliki node publikasi dan edge relasi yang sesuai, tanpa edge duplikat.
+
+---
+
+## 16. Langkah Selanjutnya
+
+1. Verifikasi bahwa **shared library** (`kalimantanbio-shared`) sudah tersedia; jika belum, blokir pengerjaan sampai siap.
+2. Finalisasi domain model bersama project lead (tipe `Species` sudah standar; tipe `Publication`, `ResearchTopic`, `ResearchLocation` spesifik modul).
+3. Sepakati format sumber data publikasi (JSON/CSV/fixture) dan field minimum wajib.
+4. Sepakati kosakata resmi topik penelitian dan hierarki lokasi studi.
+5. Sepakati formula ranking relevansi dan bobot setiap sinyal (spesies, topik, lokasi, tahun, teks).
+6. Sepakati definisi coverage dan threshold understudied species.
+7. Tentukan pembagian fungsi berdasarkan PIC (isi tabel Bagian 11).
+8. Setiap PIC membuat signature dan dokumentasi singkat fungsi masing-masing.
+9. Review interface bersama sebelum implementasi logic dimulai.
+10. Siapkan data dummy `Vec<Publication>` (independen dari DB) untuk unit test.
+11. Implementasikan fungsi secara paralel sesuai pembagian kerja; gunakan fungsi shared library.
+12. Setiap PIC membuat unit test untuk fungsi masing-masing.
+13. Gabungkan seluruh tahap ke dalam pipeline `explore_knowledge()`.
+14. Lakukan pengujian end-to-end menggunakan data dummy dan kemudian data production (via shared library).
+15. Dokumentasikan hasil dan contoh penggunaan modul.
+16. Review akhir sebelum modul dianggap selesai.

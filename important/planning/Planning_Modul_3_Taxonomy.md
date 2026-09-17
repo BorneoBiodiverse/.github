@@ -4,7 +4,7 @@
 **Bahasa:** Rust  
 **Cakupan:** Pembangunan pohon taksonomi hirarkis, eksplorasi berbasis takson, analisis keanekaragaman (diversity), analisis coverage/gap, dan eksplorasi taksonomi endemik Kalimantan.  
 
-**Repository:** Part of KalimantanBio monorepo workspace (`crates/module3-taxonomy`)  
+**Repository:** Part of KalimantanBio monorepo workspace (`crates/taxonomy`)  
 **API Integration:** Production KalimantanBio API (PostgreSQL via shared library)
 
 > **PENTING**: Modul ini menggunakan **Shared Library** (`kalimantanbio-shared`) untuk tipe data dan fungsi umum. Lihat [MASTERPLAN.md](../MASTERPLAN.md) untuk arsitektur lengkap.
@@ -213,9 +213,9 @@ Membaca data mentah, memvalidasi, dan memetakan ke dalam Domain Model tanpa muta
 
 | Fungsi | Signature | Deskripsi |
 | --- | --- | --- |
-| `parse_taxons` | `fn parse_taxons(raw: &[RawTaxonRecord]) -> Result<Vec<Taxon>, ParseError>` | Memvalidasi dan memetakan data mentah takson menjadi `Vec<Taxon>`. |
-| `parse_species` | `fn parse_species(raw: &[RawSpeciesRecord]) -> Result<Vec<Species>, ParseError>` | Memvalidasi data spesies dan memastikan `genus_id` valid. |
-| `validate_hierarchy` | `fn validate_hierarchy(taxons: &[Taxon]) -> bool` | Pure function untuk mengecek tidak adanya cyclic reference atau orphan node. |
+| `parse_taxons` | `fn parse_taxons(raw: &[RawTaxonRecord]) -> Result<Vec<Taxon>, ParseError>` | **MODULE-SPECIFIC**: Memvalidasi dan memetakan data mentah takson menjadi `Vec<Taxon>`. |
+| `parse_species` | `fn parse_species(raw: &[RawSpeciesRecord]) -> Result<Species, ParseError>` | **MODULE-SPECIFIC**: Memvalidasi data spesies dan memastikan `genus_id` valid. |
+| `validate_hierarchy` | `fn validate_hierarchy(taxons: &[Taxon]) -> bool` | **MODULE-SPECIFIC**: Pure function untuk mengecek tidak adanya cyclic reference atau orphan node. |
 
 **Person in Charge:** **[Nama Anggota]**
 
@@ -227,52 +227,59 @@ Membangun struktur pohon (hirarki) menggunakan pendekatan FP (rekursi, folding, 
 
 | Fungsi | Signature | Deskripsi |
 | --- | --- | --- |
-| `build_taxonomy_map` | `fn build_taxonomy_map(taxons: &[Taxon]) -> HashMap<TaxonId, Vec<TaxonId>>` | Mengelompokkan `parent_id` ke `children_ids` menggunakan `.fold()` atau `.group_by()`. |
-| `get_lineage` | `fn get_lineage(taxon_id: &TaxonId, map: &HashMap<TaxonId, Taxon>) -> Vec<Taxon>` | Menelusuri ke atas (iteratif) untuk mendapatkan Kingdom -> ... -> Genus dari satu node. |
-| `get_subtree_species` | `fn get_subtree_species(target: &TaxonId, map: &HashMap<TaxonId, Vec<TaxonId>>, species: &[Species]) -> Vec<Species>` | Mengumpulkan semua spesies yang berada di bawah target takson. |
-| `extract_our_genera` | `fn extract_our_genera(taxons: &[Taxon]) -> HashSet<String>` | Mengekstrak semua nama Genus yang ada di database lokal untuk keperluan analisis gap. |
+| `build_taxonomy_map` | `fn build_taxonomy_map(taxons: &[Taxon]) -> HashMap<TaxonId, Vec<TaxonId>>` | **MODULE-SPECIFIC**: Mengelompokkan `parent_id` ke `children_ids` menggunakan `.fold()` atau `.group_by()`. |
+| `get_lineage` | `fn get_lineage(taxon_id: &TaxonId, map: &HashMap<TaxonId, Taxon>) -> Vec<Taxon>` | **MODULE-SPECIFIC**: Menelusuri ke atas (iteratif) untuk mendapatkan Kingdom -> ... -> Genus dari satu node. |
+| `get_subtree_species` | `fn get_subtree_species(target: &TaxonId, map: &HashMap<TaxonId, Vec<TaxonId>>, species: &[Species]) -> Vec<Species>` | **MODULE-SPECIFIC**: Mengumpulkan semua spesies yang berada di bawah target takson. |
+| `extract_our_genera` | `fn extract_our_genera(taxons: &[Taxon]) -> HashSet<String>` | **MODULE-SPECIFIC**: Mengekstrak semua nama Genus yang ada di database lokal untuk keperluan analisis gap. |
 
 **Person in Charge:** **[Nama Kamu]**
 
 ---
 
-## 5. Tahap 3 — Diversity & Endemic Analytics
+## 6. Tahap 3 — Diversity & Endemic Analytics
+
+> **Catatan**: Fungsi `count_by_key` dan `frequency_distribution` menggunakan **shared library**.
 
 Melakukan agregasi data untuk menghitung statistik dan memfilter spesies endemik menggunakan Higher-Order Functions.
 
 | Fungsi | Signature | Deskripsi |
 | --- | --- | --- |
-| `calculate_diversity` | `fn calculate_diversity(species_subset: &[Species]) -> DiversityStats` | Menggunakan `.iter().fold()` untuk menghitung total genus, famili, dan status endemik. |
-| `filter_endemic_taxa` | `fn filter_endemic_taxa(taxons: &[Taxon], species: &[Species]) -> Vec<Taxon>` | Memfilter hanya Genus/Family yang memiliki spesies endemik Kalimantan menggunakan `.filter()`. |
-| `rank_taxon_richness` | `fn rank_taxon_richness(map: &HashMap<TaxonId, Vec<TaxonId>>, species: &[Species]) -> Vec<(Taxon, usize)>` | Mengurutkan Famili berdasarkan jumlah spesies terbanyak (Species Richness). |
-| `get_subtree_species` | `fn get_subtree_species(target: &TaxonId, map: &HashMap<TaxonId, Vec<TaxonId>>, species: &[Species]) -> Vec<Species>` | Mengumpulkan semua spesies yang berada di bawah target takson. |
+| `calculate_diversity` | `fn calculate_diversity(species_subset: &[Species]) -> DiversityStats` | **Uses SHARED `count_by_key`**: Menghitung total genus, famili, dan jumlah spesies endemik. Counting keluarga/genus diserahkan ke shared library. |
+| `filter_endemic_taxa` | `fn filter_endemic_taxa(taxons: &[Taxon], species: &[Species]) -> Vec<Taxon>` | **MODULE-SPECIFIC**: Memfilter hanya Genus/Family yang memiliki spesies endemik Kalimantan menggunakan `.filter()`. |
+| `rank_taxon_richness` | `fn rank_taxon_richness(map: &HashMap<TaxonId, Vec<TaxonId>>, species: &[Species]) -> Vec<(Taxon, usize)>` | **Uses SHARED `frequency_distribution`**: Mengurutkan Famili berdasarkan jumlah spesies terbanyak (Species Richness). |
+| `get_subtree_species` | `fn get_subtree_species(target: &TaxonId, map: &HashMap<TaxonId, Vec<TaxonId>>, species: &[Species]) -> Vec<Species>` | **MODULE-SPECIFIC**: Mengumpulkan semua spesies yang berada di bawah target takson. |
 
 **Person in Charge:** **[Nama Kamu]**
 
 ---
 
-## 6. Tahap 4 — Coverage & Gap Analysis
+## 7. Tahap 4 — Coverage & Gap Analysis
+
+> **Catatan**: Fungsi `set_difference` dan `calculate_coverage_percentage` menggunakan **shared library**.
 
 Membandingkan data internal dengan referensi eksternal untuk menemukan Taxonomic Gap menggunakan Set Operations.
 
 | Fungsi | Signature | Deskripsi |
 | --- | --- | --- |
-| `find_missing_taxa` | `fn find_missing_taxa(our_genera: &HashSet<String>, ref_genera: &HashSet<String>) -> Vec<String>` | Menggunakan Set Difference untuk mencari Genus yang belum ada di database. |
-| `calculate_coverage_score` | `fn calculate_coverage_score(our_data: &HashSet<String>, ref_data: &HashSet<String>) -> f64` | Menghitung persentase cakupan data (0.0 hingga 1.0). |
-| `extract_our_genera` | `fn extract_our_genera(taxons: &[Taxon]) -> HashSet<String>` | Mengekstrak semua nama Genus yang ada di database lokal. |
-| `generate_gap_report` | `fn generate_gap_report(missing: &[String], score: f64) -> GapReport` | Menyusun hasil analisis gap menjadi struktur laporan. |
+| `find_missing_taxa` | **FROM SHARED LIBRARY**: `kalimantanbio_shared::collections::set_difference` | Menggunakan Set Difference untuk mencari Genus yang belum ada di database. |
+| `calculate_coverage_score` | **FROM SHARED LIBRARY**: `kalimantanbio_shared::stats::calculate_coverage_percentage` | Menghitung persentase cakupan data (0.0 hingga 1.0). |
+| `extract_our_genera` | `fn extract_our_genera(taxons: &[Taxon]) -> HashSet<String>` | **MODULE-SPECIFIC**: Mengekstrak semua nama Genus yang ada di database lokal. |
+| `generate_gap_report` | `fn generate_gap_report(missing: &[String], score: f64) -> GapReport` | **MODULE-SPECIFIC**: Menyusun hasil analisis gap menjadi struktur laporan. |
 
 **Person in Charge:** **[Nama Kamu]**
 
 ---
 
-## 7. Tahap 5 — Integrasi Pipeline & Testing
+## 8. Tahap 5 — Integrasi Pipeline & Testing
+
+> **Catatan**: Fungsi database menggunakan **shared library**.
 
 Menggabungkan fungsi-fungsi di atas menjadi entry point dan melakukan End-to-End testing.
 
 | Fungsi / Komponen | Signature / Bentuk | Deskripsi |
 | --- | --- | --- |
-| `generate_taxonomy_report` | `fn generate_taxonomy_report(input: &BioDataInput) -> Result<ExplorationReport, PipelineError>` | Entry point yang merangkai Tahap 1 hingga Tahap 4 menjadi satu laporan utuh. |
+| `generate_taxonomy_report` | `fn generate_taxonomy_report(input: &BioDataInput) -> Result<ExplorationReport, PipelineError>` | **MODULE ENTRY POINT**: Entry point yang merangkai Tahap 1 hingga Tahap 4 menjadi satu laporan utuh. |
+| `fetch_all_species` | **FROM SHARED LIBRARY**: `kalimantanbio_shared::db::fetch_all_species` | Fetch semua spesies dari production database. |
 | Unit Tests | `mod tests { ... }` | Menguji `get_lineage`, `find_missing_taxa`, dan `calculate_diversity` dengan dummy data. |
 | Pipeline Validation | `cargo test` | Menjalankan seluruh skenario pengujian secara otomatis. |
 
@@ -282,11 +289,16 @@ Menggabungkan fungsi-fungsi di atas menjadi entry point dan melakukan End-to-End
 
 ---
 
-## 8. Komposisi Pipeline Utama
+## 9. Komposisi Pipeline Utama
 
 Setelah seluruh tahap tersedia, fungsi utama modul menggabungkan proses menjadi satu pipeline.
 
 ```rust
+use kalimantanbio_shared::{
+    collections::set_difference,
+    stats::calculate_coverage_percentage,
+};
+
 fn generate_taxonomy_report(input: &BioDataInput) -> Result<ExplorationReport, PipelineError> {
     let step_1_taxons = parse_taxons(&input.raw_taxons)?;
     let step_1_species = parse_species(&input.raw_species)?;
@@ -297,8 +309,13 @@ fn generate_taxonomy_report(input: &BioDataInput) -> Result<ExplorationReport, P
     let step_3_endemic = filter_endemic_taxa(&step_1_taxons, &step_1_species);
     let step_3_richness = rank_taxon_richness(&step_2_map, &step_1_species);
     
-    let step_4_missing = find_missing_taxa(&our_genera, &input.reference_genera);
-    let step_4_score = calculate_coverage_score(&our_genera, &input.reference_genera);
+    // Shared library: set_difference
+    let step_4_missing = set_difference(&input.reference_genera, &our_genera);
+    // Shared library: calculate_coverage_percentage
+    let step_4_score = calculate_coverage_percentage(
+        our_genera.len(),
+        input.reference_genera.len()
+    );
     
     Ok(ExplorationReport {
         endemic_genera: step_3_endemic,
@@ -314,22 +331,22 @@ Pipeline konseptual:
 ```text
 Input
   ↓
-[Stage 1: Parsing & Validation]
+[Stage 1: Parsing & Validation]        (module-specific)
   ↓
-[Stage 2: Tree Construction]
+[Stage 2: Tree Construction]           (module-specific)
   ↓
-[Stage 3: Diversity & Endemic Filtering]
+[Stage 3: Diversity & Endemic Filtering] (uses SHARED count_by_key)
   ↓
-[Stage 4: Set Operations for Gap Analysis]
+[Stage 4: Set Operations for Gap Analysis] (uses SHARED set_difference)
   ↓
 Output (ExplorationReport)
 ```
 
-Fungsi utama merupakan **entry point** modul dan menjadi contoh penerapan **function composition**, yaitu menggabungkan beberapa fungsi dengan tanggung jawab spesifik menjadi satu proses yang lebih besar.
+Fungsi utama merupakan **entry point** modul dan menjadi contoh penerapan **function composition**, yaitu menggabungkan fungsi shared library dengan fungsi module-specific menjadi satu proses yang lebih besar.
 
 ---
 
-## 9. Prinsip Functional Programming yang Perlu Dipegang Tim
+## 10. Prinsip Functional Programming yang Perlu Dipegang Tim
 
 ### Pure Functions
 
@@ -380,15 +397,17 @@ Setiap fungsi sebaiknya memiliki satu tanggung jawab yang jelas dan dapat diuji 
 
 ---
 
-## 10. Pembagian Kerja — 1 Anggota
+## 11. Pembagian Kerja — 1 Anggota
 
 | # | Tahap | Fungsi / Tanggung Jawab Utama | PIC | Status |
 | --- | --- | --- | --- | --- |
 | 1 | Tahap 1 | `parse_taxons`, `parse_species`, `validate_hierarchy` | [Nama Kamu] | Belum dimulai |
 | 2 | Tahap 2 | `build_taxonomy_map`, `get_lineage`, `get_subtree_species` | [Nama Kamu] | Belum dimulai |
-| 3 | Tahap 3 | `calculate_diversity`, `filter_endemic_taxa`, `rank_taxon_richness` | [Nama Kamu] | Belum dimulai |
-| 4 | Tahap 4 | `find_missing_taxa`, `calculate_coverage_score`, `extract_our_genera` | [Nama Kamu] | Belum dimulai |
+| 3 | Tahap 3 | `calculate_diversity`, `filter_endemic_taxa`, `rank_taxon_richness` (counting via shared) | [Nama Kamu] | Belum dimulai |
+| 4 | Tahap 4 | `extract_our_genera`, `generate_gap_report` (set ops via shared) | [Nama Kamu] | Belum dimulai |
 | 5 | Tahap 5 | `generate_taxonomy_report` & Unit Testing | [Nama Kamu] | Belum dimulai |
+
+> **Catatan:** Fungsi `set_difference`, `calculate_coverage_percentage`, `count_by_key`, dan `frequency_distribution` berasal dari **shared library** (`kalimantanbio-shared`) dan **tidak perlu diimplementasikan** di modul ini. Data diambil dari production database melalui `fetch_all_species` (shared library).
 
 ### Pembagian Tanggung Jawab
 
@@ -402,7 +421,7 @@ Setiap PIC bertanggung jawab terhadap:
 
 ---
 
-## 11. Kesepakatan Antaranggota
+## 12. Kesepakatan Antaranggota
 
 Sebelum implementasi dimulai, seluruh anggota perlu menyepakati:
 
@@ -421,7 +440,7 @@ Tujuannya adalah memastikan fungsi yang dikembangkan oleh anggota berbeda tetap 
 
 ---
 
-## 12. Independensi Modul
+## 13. Independensi Modul
 
 Modul ini dikembangkan sebagai komponen independen dalam KalimantanBio.
 
@@ -430,33 +449,33 @@ Prinsip yang digunakan:
 * Modul dapat dikembangkan secara mandiri.
 * Modul dapat diuji secara mandiri.
 * Modul tidak boleh bergantung pada implementasi internal modul lain.
-* Gunakan shared concepts atau data conventions hanya ketika diperlukan.
+* Modul hanya bergantung pada **shared library** (`kalimantanbio-shared`) untuk tipe data dan fungsi umum.
 * Integrasi dengan modul lain bersifat opsional dan dilakukan melalui interface yang telah disepakati.
 * Jangan mengasumsikan dependency terhadap modul lain tanpa kebutuhan teknis yang jelas.
 
 ```text
-              KalimantanBio
-                   │
-          ┌────────┼────────┐
-          │        │        │
-         M1       M2       M3 (Modul Kamu - Foundation)
-          │        │        │
-         M4       M5
-          │        │
-          └────────┴────────┐
-                            │
-                    Optional Integration
+          KalimantanBio
+               │
+               │  ((shared))  kalimantanbio-shared
+               │
+          ┌────┴────┐
+          │         │
+     Modul ini    Modul lain
+       (M3)       (M1, M2, M4, M5)
 ```
+
+Modul ini (M3) hanya bergantung pada shared library, bukan pada modul lain.
 
 Diagram di atas menggambarkan hubungan **konseptual**, bukan dependency teknis.
 
 ---
 
-## 13. Kriteria Selesai Modul
+## 14. Kriteria Selesai Modul
 
 Modul dianggap siap untuk tahap akhir apabila:
 
 * [ ] Seluruh fungsi utama telah diimplementasikan.
+* [ ] Fungsi-fungsi dari **shared library** digunakan, bukan diduplikasi.
 * [ ] Setiap fungsi memiliki unit test yang relevan.
 * [ ] Pipeline utama dapat berjalan end-to-end.
 * [ ] Input dapat diproses sesuai spesifikasi.
@@ -469,7 +488,7 @@ Modul dianggap siap untuk tahap akhir apabila:
 
 ---
 
-## 14. Contoh Skenario Pengujian
+## 15. Contoh Skenario Pengujian
 
 ### Skenario 1 — Menghitung Keanekaragaman Familia Tertentu
 
@@ -509,8 +528,10 @@ vec!["Genus C"] (Missing Taxa)
 
 **Fungsi yang diuji:**
 
-* `find_missing_taxa`
-* `calculate_coverage_score`
+* `extract_our_genera`
+* `generate_gap_report`
+* `kalimantanbio_shared::collections::set_difference` (shared)
+* `kalimantanbio_shared::stats::calculate_coverage_percentage` (shared)
 
 ---
 
@@ -525,17 +546,15 @@ vec!["Genus C"] (Missing Taxa)
 
 ---
 
-## 15. Langkah Selanjutnya
+## 16. Langkah Selanjutnya
 
-1. Finalisasi domain model bersama seluruh anggota.
-2. Sepakati input, output, dan signature me-masing fungsi.
-3. Tentukan pembagian fungsi berdasarkan PIC.
-4. Setiap PIC membuat signature dan dokumentasi singkat fungsi masing-masing.
-5. Review interface sebelum implementasi logic dimulai.
-6. Siapkan data dummy atau test fixtures.
-7. Implementasikan fungsi secara paralel sesuai pembagian kerja.
-8. Setiap PIC membuat unit test untuk fungsi masing-masing.
-9. Gabungkan seluruh tahap ke dalam pipeline utama.
-10. Lakukan pengujian end-to-end.
-11. Dokumentasikan hasil dan contoh penggunaan modul.
-12. Review akhir sebelum modul dianggap selesai.
+1. Verifikasi bahwa **shared library** (`kalimantanbio-shared`) sudah tersedia; jika belum, blokir pengerjaan sampai siap.
+2. Finalisasi domain model bersama project lead (tipe `Species`, `Taxonomy` sudah standar).
+3. Sepakati input, output, dan signature setiap fungsi yang spesifik untuk modul.
+4. Siapkan data dummy atau test fixtures (gunakan fixtures dari shared library bila tersedia).
+5. Implementasikan fungsi modul; gunakan fungsi shared library untuk set operations dan stats.
+6. Buat unit test untuk setiap fungsi modul.
+7. Gabungkan seluruh tahap ke dalam pipeline utama.
+8. Lakukan pengujian end-to-end (termasuk koneksi production database via shared library).
+9. Dokumentasikan hasil dan contoh penggunaan modul.
+10. Review akhir sebelum modul dianggap selesai.

@@ -4,7 +4,7 @@
 **Bahasa:** Rust  
 **Cakupan:** Backend penemuan spesies terkait, perhitungan kekuatan hubungan, penjelasan hubungan, serta penyediaan data jaringan spesies melalui API JSON.  
 **Teknologi:** Rust untuk domain dan komputasi inti; Axum untuk layanan HTTP/API (unified server).  
-**Repository:** Part of KalimantanBio monorepo workspace (`crates/module2-relationship`)  
+**Repository:** Part of KalimantanBio monorepo workspace (`crates/species-relationships`)  
 **API Integration:** Production KalimantanBio API (PostgreSQL via shared library)
 
 > **PENTING**: Modul ini menggunakan **Shared Library** (`kalimantanbio-shared`) untuk tipe data dan fungsi umum. Lihat [MASTERPLAN.md](../MASTERPLAN.md) untuk arsitektur lengkap.
@@ -241,6 +241,14 @@ pub fn calculate_relationship(
 Modul ini menggunakan `Species` dan `Taxonomy` dari shared library. Lihat [MASTERPLAN.md](../MASTERPLAN.md) untuk definisi lengkap.
 
 > **Catatan:** Struktur data sudah distandardisasi di shared library dan digunakan oleh semua modul. Tidak boleh ada modifikasi pada tipe ini tanpa koordinasi dengan project lead.
+
+### 3.2 Module-Specific Types
+
+Tipe berikut spesifik untuk Modul 2 dan didefinisikan di crate ini:
+
+```rust
+#[derive(Debug, Clone)]
+struct RelatedSpecies {
     species: Species,
     score: RelationshipScore,
     explanations: Vec<String>,
@@ -308,17 +316,17 @@ enum ExplorerError {
 
 ---
 
-## 3. Tahap 1 — Validasi dan Normalisasi Data
+## 4. Tahap 1 — Validasi dan Normalisasi Data
 
 Menyiapkan snapshot spesies menjadi input konsisten. Fungsi inti menerima data melalui parameter; pembacaan database atau berkas dilakukan adapter.
 
 | Fungsi | Signature | Deskripsi |
 | --- | --- | --- |
-| `normalize_species` | `fn normalize_species(species: &Species) -> Species` | Membuat salinan dengan label atribut yang di-trim, huruf kecil, spasi berlebih dirapikan, dan nilai kosong dihapus. ID tetap dipertahankan. |
-| `prepare_species` | `fn prepare_species(input: &[Species]) -> Result<Vec<Species>, ExplorerError>` | Menormalisasi semua record dan memvalidasi ID unik, ID tanpa spasi tepi, serta nama ilmiah tidak kosong. Dataset kosong tetap valid. |
-| `validate_query` | `fn validate_query(query: &RelationshipQuery) -> Result<(), ExplorerError>` | Memeriksa ID tidak kosong, skor finite pada 0–1, dan limit 1–50. |
-| `validate_weights` | `fn validate_weights(weights: &ScoreWeights) -> Result<(), ExplorerError>` | Memastikan semua bobot finite, nonnegatif, dan jumlahnya 1 dengan toleransi `1e-9`. |
-| `find_species` | `fn find_species<'a>(species: &'a [Species], id: &str) -> Result<&'a Species, ExplorerError>` | Mengambil spesies pusat berdasarkan ID atau menghasilkan `SpeciesNotFound`. |
+| `normalize_species` | `fn normalize_species(species: &Species) -> Species` | **MODULE-SPECIFIC**: Membuat salinan dengan label atribut yang di-trim, huruf kecil, spasi berlebih dirapikan, dan nilai kosong dihapus. ID tetap dipertahankan. |
+| `prepare_species` | `fn prepare_species(input: &[Species]) -> Result<Vec<Species>, ExplorerError>` | **MODULE-SPECIFIC**: Menormalisasi semua record dan memvalidasi ID unik, ID tanpa spasi tepi, serta nama ilmiah tidak kosong. Dataset kosong tetap valid. |
+| `validate_query` | `fn validate_query(query: &RelationshipQuery) -> Result<(), ExplorerError>` | **MODULE-SPECIFIC**: Memeriksa ID tidak kosong, skor finite pada 0–1, dan limit 1–50. |
+| `validate_weights` | `fn validate_weights(weights: &ScoreWeights) -> Result<(), ExplorerError>` | **Uses SHARED `validate_weights_sum_to_one` / `validate_score_range`**: Memastikan semua bobot finite, nonnegatif, dan jumlahnya 1 dengan toleransi `1e-9`. |
+| `find_species` | `fn find_species<'a>(species: &'a [Species], id: &str) -> Result<&'a Species, ExplorerError>` | **MODULE-SPECIFIC**: Mengambil spesies pusat berdasarkan ID atau menghasilkan `SpeciesNotFound`. |
 
 Normalisasi tidak menerjemahkan istilah atau menyimpulkan sinonim. Pemetaan label lintas sumber menjadi tanggung jawab adapter/kurasi data dan harus terdokumentasi. Taksonomi yang diketahui bertentangan perlu ditandai saat kurasi; pemeriksaan string dalam modul tidak membuktikan validitas biologisnya.
 
@@ -326,16 +334,16 @@ Normalisasi tidak menerjemahkan istilah atau menyimpulkan sinonim. Pemetaan labe
 
 ---
 
-## 4. Tahap 2 — Ekstraksi Bukti dan Relationship Scoring
+## 5. Tahap 2 — Ekstraksi Bukti dan Relationship Scoring
 
 Membandingkan setiap kandidat terhadap spesies pusat. Semua skor dihitung dari data hasil normalisasi dan aturan eksplisit.
 
 | Fungsi | Signature | Deskripsi |
 | --- | --- | --- |
-| `taxonomy_evidence` | `fn taxonomy_evidence(a: &Taxonomy, b: &Taxonomy) -> AttributeEvidence` | Mengambil kesamaan pada tingkat ordo, famili, dan genus serta nilai taksonomi tertinggi yang cocok. |
-| `set_evidence` | `fn set_evidence(kind: AttributeKind, a: &BTreeSet<String>, b: &BTreeSet<String>) -> AttributeEvidence` | Menghitung Jaccard dan irisan nilai untuk habitat atau karakteristik. |
-| `collect_evidence` | `fn collect_evidence(a: &Species, b: &Species) -> Vec<AttributeEvidence>` | Menghasilkan tepat satu bukti per dimensi, berurutan taksonomi, habitat, karakteristik. |
-| `calculate_relationship` | `fn calculate_relationship(evidence: &[AttributeEvidence], weights: &ScoreWeights) -> RelationshipScore` | Menggabungkan similarity dan coverage memakai bobot yang telah divalidasi. |
+| `taxonomy_evidence` | `fn taxonomy_evidence(a: &Taxonomy, b: &Taxonomy) -> AttributeEvidence` | **Uses SHARED `calculate_taxonomy_similarity`**: Mengambil kesamaan pada tingkat ordo, famili, dan genus serta nilai taksonomi tertinggi yang cocok. |
+| `set_evidence` | `fn set_evidence(kind: AttributeKind, a: &BTreeSet<String>, b: &BTreeSet<String>) -> AttributeEvidence` | **Uses SHARED `jaccard_similarity`**: Menghitung Jaccard dan irisan nilai untuk habitat atau karakteristik. |
+| `collect_evidence` | `fn collect_evidence(a: &Species, b: &Species) -> Vec<AttributeEvidence>` | **MODULE-SPECIFIC**: Menghasilkan tepat satu bukti per dimensi, berurutan taksonomi, habitat, karakteristik. |
+| `calculate_relationship` | `fn calculate_relationship(evidence: &[AttributeEvidence], weights: &ScoreWeights) -> RelationshipScore` | **Uses SHARED `combine_weighted_scores`**: Menggabungkan similarity dan coverage memakai bobot yang telah divalidasi. |
 
 ### Aturan Scoring Awal
 
@@ -363,16 +371,16 @@ Skor disimpan tanpa pembulatan untuk filter dan ranking. Pembulatan hanya untuk 
 
 ---
 
-## 5. Tahap 3 — Discovery, Ranking, dan Penjelasan Hubungan
+## 6. Tahap 3 — Discovery, Ranking, dan Penjelasan Hubungan
 
 Menghasilkan rekomendasi spesies terkait beserta alasan yang bisa ditelusuri kembali ke atribut input.
 
 | Fungsi | Signature | Deskripsi |
 | --- | --- | --- |
-| `candidate_species` | `fn candidate_species<'a>(all: &'a [Species], center_id: &str) -> Vec<&'a Species>` | Mengambil semua spesies selain pusat. Versi awal mengevaluasi semua kandidat agar hasil mudah diverifikasi. |
-| `explain_relationship` | `fn explain_relationship(score: &RelationshipScore, weights: &ScoreWeights) -> Vec<String>` | Membentuk penjelasan berbasis template dari nilai bersama, kontribusi berbobot, dan data tidak tersedia. |
-| `score_candidates` | `fn score_candidates(center: &Species, candidates: &[&Species], weights: &ScoreWeights) -> Vec<RelatedSpecies>` | Mengomposisikan ekstraksi bukti, perhitungan skor, dan penjelasan untuk setiap kandidat. |
-| `rank_related` | `fn rank_related(items: Vec<RelatedSpecies>, query: &RelationshipQuery) -> Vec<RelatedSpecies>` | Menyaring, mengurutkan, lalu membatasi hasil sesuai kueri. |
+| `candidate_species` | `fn candidate_species<'a>(all: &'a [Species], center_id: &str) -> Vec<&'a Species>` | **MODULE-SPECIFIC**: Mengambil semua spesies selain pusat. Versi awal mengevaluasi semua kandidat agar hasil mudah diverifikasi. |
+| `explain_relationship` | `fn explain_relationship(score: &RelationshipScore, weights: &ScoreWeights) -> Vec<String>` | **MODULE-SPECIFIC**: Membentuk penjelasan berbasis template dari nilai bersama, kontribusi berbobot, dan data tidak tersedia. |
+| `score_candidates` | `fn score_candidates(center: &Species, candidates: &[&Species], weights: &ScoreWeights) -> Vec<RelatedSpecies>` | **MODULE-SPECIFIC**: Mengomposisikan ekstraksi bukti, perhitungan skor, dan penjelasan untuk setiap kandidat. |
+| `rank_related` | `fn rank_related(items: Vec<RelatedSpecies>, query: &RelationshipQuery) -> Vec<RelatedSpecies>` | **Uses SHARED `rank_by_score` / `filter_by_threshold`**: Menyaring, mengurutkan, lalu membatasi hasil sesuai kueri. |
 
 Urutan aturan `rank_related`:
 
@@ -387,16 +395,16 @@ Contoh penjelasan: “Memiliki genus yang sama: genus-a. Kontribusi taksonomi 0,
 
 ---
 
-## 6. Tahap 4 — Pembentukan Data Species Network
+## 7. Tahap 4 — Pembentukan Data Species Network
 
 Mengubah rekomendasi menjadi struktur graf yang dikembalikan melalui API dan dapat digunakan oleh antarmuka apa pun di tahap berikutnya. Node merepresentasikan spesies dan edge merepresentasikan kesamaan atribut antara pusat dan tetangga.
 
 | Fungsi | Signature | Deskripsi |
 | --- | --- | --- |
-| `make_node` | `fn make_node(species: &Species, is_center: bool) -> NetworkNode` | Membuat node dengan ID stabil, label nama ilmiah, dan penanda pusat. |
-| `make_edge` | `fn make_edge(center_id: &str, related: &RelatedSpecies) -> NetworkEdge` | Membuat edge berisi skor, coverage, bukti, dan penjelasan yang sama dengan hasil discovery. |
-| `build_network` | `fn build_network(center: &Species, related: &[RelatedSpecies]) -> SpeciesNetwork` | Menggabungkan satu node pusat, node tetangga unik, dan edge tanpa self-loop atau duplikasi. |
-| `assemble_result` | `fn assemble_result(center: &Species, related: Vec<RelatedSpecies>, weights: &ScoreWeights) -> ExplorerResult` | Menyatukan daftar rekomendasi, graf, bobot, dan versi scoring menjadi output modul. |
+| `make_node` | `fn make_node(species: &Species, is_center: bool) -> NetworkNode` | **MODULE-SPECIFIC**: Membuat node dengan ID stabil, label nama ilmiah, dan penanda pusat. |
+| `make_edge` | `fn make_edge(center_id: &str, related: &RelatedSpecies) -> NetworkEdge` | **MODULE-SPECIFIC**: Membuat edge berisi skor, coverage, bukti, dan penjelasan yang sama dengan hasil discovery. |
+| `build_network` | `fn build_network(center: &Species, related: &[RelatedSpecies]) -> SpeciesNetwork` | **MODULE-SPECIFIC**: Menggabungkan satu node pusat, node tetangga unik, dan edge tanpa self-loop atau duplikasi. |
+| `assemble_result` | `fn assemble_result(center: &Species, related: Vec<RelatedSpecies>, weights: &ScoreWeights) -> ExplorerResult` | **MODULE-SPECIFIC**: Menyatukan daftar rekomendasi, graf, bobot, dan versi scoring menjadi output modul. |
 
 Kontrak jaringan versi awal:
 
@@ -412,13 +420,13 @@ Dukungan minimum backend: perubahan pusat melalui `species_id`, filter melalui `
 
 ---
 
-## 7. Tahap 5 — Integrasi API Axum dan Pengujian Backend
+## 8. Tahap 5 — Integrasi API Axum dan Pengujian Backend
 
-Menghubungkan fungsi inti Rust dengan API Axum serta menyiapkan bukti bahwa backend berjalan sesuai kontrak tanpa ketergantungan GUI. Bentuk endpoint berikut adalah usulan integrasi, belum merupakan endpoint yang telah tersedia.
+Menghubungkan fungsi inti Rust dengan API Axum serta menyiapkan bukti bahwa backend berjalan sesuai kontrak tanpa ketergantungan GUI. Bentuk endpoint berikut adalah usulan integrasi, belum merupakan endpoint yang telah tersedia. Data spesies dibaca dari production database melalui shared library (`fetch_all_species`, `create_pool`).
 
 | Fungsi / Komponen | Signature / Bentuk | Deskripsi |
 | --- | --- | --- |
-| Adapter repository | Snapshot `Vec<Species>` dari sumber data repository | Memetakan skema penyimpanan ke domain; I/O dan kegagalan sumber data ditangani di luar fungsi murni. |
+| Adapter repository | Snapshot `Vec<Species>` dari sumber data repository | **Uses SHARED `fetch_all_species` / `create_pool`**: Memetakan skema penyimpanan ke domain; I/O dan kegagalan sumber data ditangani di luar fungsi murni. |
 | API Axum | `GET /api/v1/species/{species_id}/relationships?min_score=0.2&limit=10&required_basis=habitat` | Mem-parse input, menerapkan default, memanggil pipeline, dan mengembalikan JSON `ExplorerResult`. Parameter basis bersifat opsional. |
 | Adapter JSON dan error | DTO request/response serta pemetaan status HTTP | Field mengikuti kontrak domain; enum basis memakai `taxonomy`, `habitat`, atau `characteristic`. |
 | Dokumentasi dan demo API | Kontrak JSON serta contoh request/response menggunakan klien HTTP | Menjelaskan cara memilih pusat, mengubah filter, membaca graf, dan menangani error tanpa GUI. |
@@ -442,7 +450,7 @@ Konfigurasi alamat layanan, timeout, dan kredensial mengikuti lingkungan deploym
 
 ---
 
-## 8. Komposisi Pipeline Utama
+## 9. Komposisi Pipeline Utama
 
 Fungsi berikut merupakan rancangan komposisi domain. Fungsi pendukung harus diimplementasikan sesuai tabel tahap; contoh ini bukan implementasi lengkap aplikasi.
 
@@ -478,7 +486,7 @@ Fungsi utama menjadi **entry point** domain dan contoh **function composition**.
 
 ---
 
-## 9. Prinsip Functional Programming yang Perlu Dipegang Tim
+## 10. Prinsip Functional Programming yang Perlu Dipegang Tim
 
 ### Pure Functions
 
@@ -514,7 +522,7 @@ Pemilihan pemenang skor seri harus eksplisit, sehingga urutan data dari database
 
 ---
 
-## 10. Pembagian Kerja — 3 Anggota
+## 11. Pembagian Kerja — 3 Anggota
 
 Tim terdiri dari tiga anggota dengan pembagian tahap berikut. Lima tahap dalam template tetap dipertahankan; satu anggota dapat bertanggung jawab atas dua tahap. Nama anggota diisi kemudian.
 
@@ -527,10 +535,12 @@ Tim terdiri dari tiga anggota dengan pembagian tahap berikut. Lima tahap dalam t
 | # | Tahap | Fungsi / Tanggung Jawab Utama | PIC | Status |
 | --- | --- | --- | --- | --- |
 | 1 | Validasi dan normalisasi | `normalize_species`, `prepare_species`, `validate_query`, `validate_weights`, `find_species` | Anggota 1 | Belum dimulai |
-| 2 | Bukti dan scoring | `taxonomy_evidence`, `set_evidence`, `collect_evidence`, `calculate_relationship` | Anggota 2 | Belum dimulai |
-| 3 | Discovery dan penjelasan | `candidate_species`, `explain_relationship`, `score_candidates`, `rank_related` | Anggota 1 | Belum dimulai |
+| 2 | Bukti dan scoring | `taxonomy_evidence`, `set_evidence`, `collect_evidence`, `calculate_relationship` (via shared `calculate_taxonomy_similarity`, `jaccard_similarity`, `combine_weighted_scores`) | Anggota 2 | Belum dimulai |
+| 3 | Discovery dan penjelasan | `candidate_species`, `explain_relationship`, `score_candidates`, `rank_related` (via shared `rank_by_score`) | Anggota 1 | Belum dimulai |
 | 4 | Data jaringan | `make_node`, `make_edge`, `build_network`, `assemble_result`, kontrak output graf | Anggota 3 | Belum dimulai |
 | 5 | Integrasi dan testing backend | `explore_relationships`, adapter data, API Axum, dokumentasi JSON, end-to-end tests backend | Anggota 3 | Belum dimulai |
+
+> **Catatan:** Fungsi `validate_weights_sum_to_one`, `validate_score_range`, `calculate_taxonomy_similarity`, `jaccard_similarity`, `combine_weighted_scores`, dan `rank_by_score` berasal dari **shared library** (`kalimantanbio-shared`) dan **tidak perlu diimplementasikan** di modul ini. Data diambil dari production database melalui `fetch_all_species` (shared library).
 
 ### Pembagian Tanggung Jawab
 
@@ -546,7 +556,7 @@ Urutan ketergantungan kerja: sepakati model, aturan skor, dan fixture terlebih d
 
 ---
 
-## 11. Kesepakatan Antaranggota
+## 12. Kesepakatan Antaranggota
 
 Sebelum implementasi, seluruh anggota perlu menyepakati:
 
@@ -570,20 +580,22 @@ Bobot merupakan heuristik awal yang harus ditinjau dengan dosen atau kurator dom
 
 ---
 
-## 12. Independensi Modul
+## 13. Independensi Modul
 
 Modul ini dikembangkan sebagai komponen independen dalam KalimantanBio.
 
 Prinsip yang digunakan:
 
 * Inti Rust dapat dijalankan dan diuji menggunakan fixture tanpa server Axum, GUI, atau modul lain. Layanan Axum diuji terpisah pada lapisan integrasi HTTP.
-* Adapter repository menyediakan data spesies melalui kontrak domain.
+* Adapter repository menyediakan data spesies melalui **shared library** (`fetch_all_species`, `create_pool`).
+* Modul hanya bergantung pada **shared library** (`kalimantanbio-shared`) untuk tipe data, scoring, dan validasi umum.
 * Tidak ada ketergantungan pada implementasi internal Modul 1, 3, 4, atau 5.
 * Konvensi ID dan atribut bersama hanya digunakan melalui interface yang disepakati.
 * Integrasi dengan fitur lain bersifat opsional; contohnya menerima ID hasil pencarian atau membuka detail spesies.
 
 | Komponen | Hubungan dengan Modul 2 |
 | --- | --- |
+| Shared library (`kalimantanbio-shared`) | Satu-satunya dependency: tipe `Species`/`Taxonomy`, `calculate_taxonomy_similarity`, `jaccard_similarity`, `combine_weighted_scores`, `validate_weights_sum_to_one`, `fetch_all_species`. |
 | Repository data spesies | Menyediakan snapshot data melalui adapter yang terpisah dari fungsi inti. |
 | Axum | Mengekspos fungsi modul melalui API. |
 | GUI mendatang (teknologi belum ditentukan) | Integrasi lanjutan sebagai konsumen API HTTP/JSON; tidak menjadi dependency backend. |
@@ -596,11 +608,12 @@ Tabel tersebut menjelaskan hubungan konseptual dan titik integrasi. Modul lain t
 
 ---
 
-## 13. Kriteria Selesai Modul
+## 14. Kriteria Selesai Modul
 
 Tahap backend Rust–Axum dianggap selesai apabila:
 
 * [ ] Seluruh fungsi utama telah diimplementasikan sesuai kontrak.
+* [ ] Fungsi-fungsi dari **shared library** digunakan, bukan diduplikasi.
 * [ ] Setiap fungsi memiliki unit test relevan, termasuk data hilang dan input tidak valid.
 * [ ] Pipeline dapat berjalan end-to-end dari spesies pusat hingga rekomendasi dan graf.
 * [ ] Skor serta coverage finite dan berada pada rentang 0–1.
@@ -620,7 +633,7 @@ Tahap backend Rust–Axum dianggap selesai apabila:
 
 ---
 
-## 14. Contoh Skenario Pengujian
+## 15. Contoh Skenario Pengujian
 
 Semua nama dan atribut berikut **sintetis**, hanya untuk memverifikasi aturan program. Gunakan bobot default `T=0.50`, `H=0.30`, dan `C=0.20`. Perbandingan angka dalam unit test menggunakan toleransi `1e-9`.
 
@@ -709,7 +722,7 @@ Pengujian integrasi tambahan: kirim permintaan API dengan pusat `sp-a`, lalu per
 
 ---
 
-## 15. Langkah Selanjutnya
+## 16. Langkah Selanjutnya
 
 1. Finalisasi dukungan backend untuk empat fitur Modul 2 dan cocokkan field rancangan dengan skema repository nyata.
 2. Sepakati domain model, makna data hilang, input/output, dan signature fungsi.
