@@ -4,7 +4,10 @@
 **Bahasa:** Rust  
 **Cakupan:** Pembangunan pohon taksonomi hirarkis, eksplorasi berbasis takson, analisis keanekaragaman (diversity), analisis coverage/gap, dan eksplorasi taksonomi endemik Kalimantan.  
 
-**Repository:** `kalimantanbio-modul3-taxonomy`
+**Repository:** Part of KalimantanBio monorepo workspace (`crates/module3-taxonomy`)  
+**API Integration:** Production KalimantanBio API (PostgreSQL via shared library)
+
+> **PENTING**: Modul ini menggunakan **Shared Library** (`kalimantanbio-shared`) untuk tipe data dan fungsi umum. Lihat [MASTERPLAN.md](../MASTERPLAN.md) untuk arsitektur lengkap.
 
 ---
 
@@ -29,24 +32,61 @@ Modul ini **tidak bertanggung jawab** terhadap:
 
 ---
 
-## 2. Struktur Data (Domain Model)
+## 2. Shared Library Integration
 
-Struktur data utama yang digunakan oleh modul:
+Modul ini menggunakan **shared library** (`kalimantanbio-shared`) untuk tipe data dan fungsi umum yang digunakan bersama dengan modul lain.
+
+### 2.1 Shared Types Used
+
+```rust
+use kalimantanbio_shared::core::{Species, Taxonomy, TaxonomicRank};
+```
+
+**Species** dan **Taxonomy** adalah tipe standar yang digunakan oleh semua modul. Definisi lengkap ada di shared library.
+
+- `Species` - Struktur data lengkap spesies dari production database
+- `Taxonomy` - Struktur hierarki taksonomi (kingdom → genus)
+- `TaxonomicRank` - Enum untuk level taksonomi
+
+### 2.2 Shared Functions Used
+
+#### From `collections` module:
+```rust
+use kalimantanbio_shared::collections::set_difference;
+```
+
+- `set_difference<T>(a: &HashSet<T>, b: &HashSet<T>) -> Vec<T>` - Mencari elemen di A yang tidak ada di B (untuk gap analysis)
+
+**Digunakan di**: Tahap 4 (Coverage & Gap Analysis)
+
+#### From `stats` module:
+```rust
+use kalimantanbio_shared::stats::{count_by_key, frequency_distribution, calculate_coverage_percentage};
+```
+
+- `count_by_key<T, K>(items: &[T], key_fn: impl Fn(&T) -> K) -> HashMap<K, usize>` - Menghitung frekuensi per key
+- `frequency_distribution<T, K>(items: &[T], key_fn: impl Fn(&T) -> K) -> Vec<(K, usize)>` - Distribusi frekuensi terurut
+- `calculate_coverage_percentage(available: usize, total: usize) -> f64` - Menghitung persentase coverage
+
+**Digunakan di**: Tahap 3 (Diversity & Endemic Analytics), Tahap 4 (Coverage & Gap Analysis)
+
+#### From `db` module:
+```rust
+use kalimantanbio_shared::db::{create_pool, fetch_all_species};
+```
+
+- `create_pool(database_url: &str) -> Result<Pool<Postgres>>` - Membuat connection pool
+- `fetch_all_species(pool: &Pool<Postgres>) -> Result<Vec<Species>>` - Fetch semua spesies
+
+**Digunakan di**: Tahap 5 (Integrasi Pipeline & Testing)
+
+### 2.3 Module-Specific Types
+
+Modul ini mendefinisikan tipe tambahan yang spesifik untuk taxonomy exploration:
 
 ```rust
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct TaxonId(pub u64);
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum TaxonomicRank {
-    Kingdom,
-    Phylum,
-    Class,
-    Order,
-    Family,
-    Genus,
-    Species,
-}
 
 #[derive(Debug, Clone)]
 struct Taxon {
@@ -54,15 +94,6 @@ struct Taxon {
     name: String,
     rank: TaxonomicRank,
     parent_id: Option<TaxonId>,
-}
-
-#[derive(Debug, Clone)]
-struct Species {
-    id: u64,
-    scientific_name: String,
-    genus_id: TaxonId,
-    is_endemic_to_borneo: bool,
-    conservation_status: String,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -79,11 +110,94 @@ struct BioDataInput {
     raw_species: Vec<RawSpeciesRecord>,
     reference_genera: std::collections::HashSet<String>,
 }
+
+#[derive(Debug, Clone)]
+struct GapReport {
+    missing_taxa: Vec<String>,
+    coverage_score: f64,
+}
+
+#[derive(Debug, Clone)]
+struct ExplorationReport {
+    endemic_genera: Vec<Taxon>,
+    richness_rank: Vec<(Taxon, usize)>,
+    missing_taxa: Vec<String>,
+    coverage_score: f64,
+}
 ```
 
-> **Catatan:** Struktur data perlu disepakati oleh seluruh anggota kelompok sebelum implementasi karena struktur ini menjadi dasar bagi fungsi-fungsi pada tahap berikutnya.
+### 2.4 Cargo.toml Dependency
 
-### Data yang Digunakan
+```toml
+[dependencies]
+kalimantanbio-shared = { path = "../shared" }
+serde = { workspace = true }
+tokio = { workspace = true }
+```
+
+### 2.5 Integration Example
+
+```rust
+use kalimantanbio_shared::{
+    core::{Species, Taxonomy},
+    collections::set_difference,
+    stats::{count_by_key, calculate_coverage_percentage},
+};
+use std::collections::HashSet;
+
+pub fn analyze_taxonomic_gap(
+    our_genera: &HashSet<String>,
+    reference_genera: &HashSet<String>,
+) -> GapReport {
+    // Gunakan shared library untuk set difference
+    let missing = set_difference(reference_genera, our_genera);
+    
+    // Gunakan shared library untuk coverage calculation
+    let coverage = calculate_coverage_percentage(
+        our_genera.len(),
+        reference_genera.len()
+    );
+    
+    GapReport {
+        missing_taxa: missing,
+        coverage_score: coverage,
+    }
+}
+
+pub fn calculate_diversity(species_list: &[Species]) -> DiversityStats {
+    // Gunakan shared library untuk counting
+    let families = count_by_key(
+        species_list,
+        |s| s.taxonomy.family.clone()
+    );
+    
+    let genera = count_by_key(
+        species_list,
+        |s| s.taxonomy.genus.clone()
+    );
+    
+    DiversityStats {
+        total_families: families.len(),
+        total_genera: genera.len(),
+        total_species: species_list.len(),
+        endemic_species_count: species_list.iter()
+            .filter(|s| s.species_type == "Endemic")
+            .count(),
+    }
+}
+```
+
+---
+
+## 3. Struktur Data (Domain Model)
+
+### 3.1 Tipe dari Shared Library
+
+Modul ini menggunakan `Species`, `Taxonomy`, dan `TaxonomicRank` dari shared library. Lihat [MASTERPLAN.md](../MASTERPLAN.md) untuk definisi lengkap.
+
+> **Catatan:** Struktur data sudah distandardisasi di shared library dan digunakan oleh semua modul. Tidak boleh ada modifikasi pada tipe ini tanpa koordinasi dengan project lead.
+
+### 3.2 Data yang Digunakan
 
 | Data | Tipe | Deskripsi |
 | --- | --- | --- |
@@ -93,7 +207,7 @@ struct BioDataInput {
 
 ---
 
-## 3. Tahap 1 — Data Ingestion & Parsing
+## 4. Tahap 1 — Data Ingestion & Parsing
 
 Membaca data mentah, memvalidasi, dan memetakan ke dalam Domain Model tanpa mutasi state.
 
@@ -103,11 +217,11 @@ Membaca data mentah, memvalidasi, dan memetakan ke dalam Domain Model tanpa muta
 | `parse_species` | `fn parse_species(raw: &[RawSpeciesRecord]) -> Result<Vec<Species>, ParseError>` | Memvalidasi data spesies dan memastikan `genus_id` valid. |
 | `validate_hierarchy` | `fn validate_hierarchy(taxons: &[Taxon]) -> bool` | Pure function untuk mengecek tidak adanya cyclic reference atau orphan node. |
 
-**Person in Charge:** **[Nama Kamu]**
+**Person in Charge:** **[Nama Anggota]**
 
 ---
 
-## 4. Tahap 2 — Taxonomic Tree Construction
+## 5. Tahap 2 — Taxonomic Tree Construction
 
 Membangun struktur pohon (hirarki) menggunakan pendekatan FP (rekursi, folding, dan pengelompokan data).
 
