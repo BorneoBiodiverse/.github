@@ -3,12 +3,13 @@
 **Mata Kuliah:** Pemrograman Fungsional  
 **Bahasa:** Rust  
 **Cakupan:** Backend penemuan spesies terkait, perhitungan kekuatan hubungan, penjelasan hubungan, serta penyediaan data jaringan spesies melalui API JSON.  
-**Teknologi:** Rust untuk domain dan komputasi inti; Axum untuk layanan HTTP/API.  
-**GUI:** Teknologi belum ditentukan; implementasi GUI ditunda dari cakupan tahap ini.  
-**Target integrasi lanjutan:** `kalimantanbio.com/repository/`; tahap ini menyiapkan layanan backend dan kontrak API.  
-**Repository:** `kalimantanbio-species-relationship-explorer` — nama usulan, disesuaikan dengan repository kelompok.
+**Teknologi:** Rust untuk domain dan komputasi inti; Axum untuk layanan HTTP/API (unified server).  
+**Repository:** Part of KalimantanBio monorepo workspace (`crates/module2-relationship`)  
+**API Integration:** Production KalimantanBio API (PostgreSQL via shared library)
 
-**Dasar penyusunan:** Modul 2 dalam `KalimantanBio Biodiversity.txt`, menggunakan struktur `planning-template.md`. Empat fitur modul mengacu pada dokumen sumber. Sesuai revisi tim, teknologi tahap ini difokuskan pada Rust dan Axum; pilihan teknologi GUI tetap terbuka. Model data, formula, batas permintaan, dan kontrak integrasi di bawah merupakan rancangan awal, bukan ketentuan yang sudah ditetapkan sumber. Pembagian PIC mengikuti keputusan tim yang terdiri dari tiga anggota: Anggota 1 menangani Tahap 1 dan 3, Anggota 2 menangani Tahap 2, serta Anggota 3 menangani Tahap 4 dan 5. Dokumen sumber tidak menyertakan dataset, skema database, nama anggota, atau jadwal; contoh pengujian memakai data sintetis.
+> **PENTING**: Modul ini menggunakan **Shared Library** (`kalimantanbio-shared`) untuk tipe data dan fungsi umum. Lihat [MASTERPLAN.md](../MASTERPLAN.md) untuk arsitektur lengkap.
+
+**Dasar penyusunan:** Modul 2 dalam spesifikasi KalimantanBio. Model data, formula, batas permintaan, dan kontrak integrasi di bawah merupakan rancangan awal. Pembagian PIC mengikuti keputusan tim yang terdiri dari tiga anggota: Anggota 1 menangani Tahap 1 dan 3, Anggota 2 menangani Tahap 2, serta Anggota 3 menangani Tahap 4 dan 5.
 
 ---
 
@@ -21,13 +22,13 @@ Modul ini bertanggung jawab untuk:
 * **Related Species Discovery:** menemukan dan mengurutkan spesies yang memiliki kesamaan dengan spesies pilihan pengguna.
 * **Relationship Scoring:** menghitung kekuatan hubungan secara deterministik berdasarkan aturan yang disepakati.
 * **Relationship Explanation:** menjelaskan atribut yang sama, kontribusinya terhadap skor, dan keterbatasan data.
-* **Interactive Species Network (dukungan backend):** menyediakan node, edge, skor, dan penjelasan melalui JSON agar nantinya dapat digunakan oleh GUI. Pergantian spesies pusat dan filter dilakukan melalui parameter permintaan API.
+* **Interactive Species Network (dukungan backend):** menyediakan node, edge, skor, dan penjelasan melalui JSON agar nantinya dapat digunakan oleh frontend. Pergantian spesies pusat dan filter dilakukan melalui parameter permintaan API.
 
 ### Batasan Modul
 
 Modul ini **tidak bertanggung jawab** terhadap:
 
-* Pemilihan teknologi dan implementasi GUI pada tahap ini, termasuk rendering graf, layout, klik node/edge, serta zoom dan pan.
+* Pemilihan teknologi dan implementasi GUI/frontend rendering (tanggung jawab Django frontend).
 * Pencarian bahasa alami dan rekomendasi kueri pada Modul 1.
 * Pohon taksonomi lengkap serta analisis cakupan taksonomi pada Modul 3.
 * Tabel perbandingan banyak spesies dan analisis ciri pembeda lengkap pada Modul 4.
@@ -35,35 +36,77 @@ Modul ini **tidak bertanggung jawab** terhadap:
 * Pengumpulan data, verifikasi biologis data sumber, atau penyelesaian sinonim otomatis; modul menerima data yang telah dikurasi.
 * Inferensi hubungan predator–mangsa, simbiosis, sebab-akibat ekologis, atau pohon filogenetik dari kesamaan atribut saja.
 
-**Ruang lingkup versi awal:** tiga dimensi skor, yaitu taksonomi, habitat, dan karakteristik terstruktur. Distribusi, penggunaan, dan atribut lain dapat ditambahkan setelah datanya tersedia dan kontrak scoring diperbarui. Data jaringan awal berupa satu spesies pusat dengan tetangga terpilih; permintaan API berikutnya dapat menggunakan ID tetangga sebagai pusat baru. Pengoperasian dan demonstrasi tahap ini menggunakan pengujian otomatis atau klien HTTP seperti curl, tanpa membutuhkan GUI.
+**Ruang lingkup versi awal:** tiga dimensi skor, yaitu taksonomi, habitat, dan karakteristik terstruktur. Data jaringan awal berupa satu spesies pusat dengan tetangga terpilih; permintaan API berikutnya dapat menggunakan ID tetangga sebagai pusat baru.
 
 ---
 
-## 2. Struktur Data (Domain Model)
+## 2. Shared Library Integration
 
-Model berikut adalah kontrak awal domain Rust. Detail serialisasi JSON ditambahkan pada lapisan adapter setelah kontrak disepakati.
+Modul ini menggunakan **shared library** (`kalimantanbio-shared`) untuk tipe data dan fungsi umum yang digunakan bersama dengan modul lain.
+
+### 2.1 Shared Types Used
 
 ```rust
-use std::collections::BTreeSet;
+use kalimantanbio_shared::core::{Species, Taxonomy};
+```
 
-type SpeciesId = String;
+**Species** dan **Taxonomy** adalah tipe standar yang digunakan oleh semua modul. Definisi lengkap ada di shared library.
 
-#[derive(Debug, Clone, Default)]
-struct Taxonomy {
-    order: Option<String>,
-    family: Option<String>,
-    genus: Option<String>,
-}
+### 2.2 Shared Functions Used
 
-#[derive(Debug, Clone)]
-struct Species {
-    id: SpeciesId,
-    scientific_name: String,
-    taxonomy: Taxonomy,
-    habitats: BTreeSet<String>,
-    characteristics: BTreeSet<String>,
-}
+#### From `taxonomy` module:
+```rust
+use kalimantanbio_shared::taxonomy::calculate_taxonomy_similarity;
+```
 
+- `calculate_taxonomy_similarity(a: &Taxonomy, b: &Taxonomy) -> f64` - Menghitung skor kesamaan taksonomi (0.0-1.0)
+
+**Digunakan di**: Tahap 2 (Ekstraksi Bukti dan Scoring)
+
+#### From `collections` module:
+```rust
+use kalimantanbio_shared::collections::jaccard_similarity;
+```
+
+- `jaccard_similarity<T>(a: &HashSet<T>, b: &HashSet<T>) -> f64` - Menghitung Jaccard similarity untuk habitat/karakteristik
+
+**Digunakan di**: Tahap 2 (Ekstraksi Bukti dan Scoring)
+
+#### From `scoring` module:
+```rust
+use kalimantanbio_shared::scoring::combine_weighted_scores;
+```
+
+- `combine_weighted_scores(scores: &[(f64, f64)]) -> f64` - Menggabungkan skor dengan bobot
+
+**Digunakan di**: Tahap 2 (Relationship Scoring)
+
+#### From `validation` module:
+```rust
+use kalimantanbio_shared::validation::{validate_score_range, validate_weights_sum_to_one};
+```
+
+- `validate_score_range(score: f64, min: f64, max: f64) -> Result<(), ValidationError>` - Validasi skor dalam range
+- `validate_weights_sum_to_one(weights: &[f64], tolerance: f64) -> Result<(), ValidationError>` - Validasi bobot
+
+**Digunakan di**: Tahap 1 (Validasi dan Normalisasi)
+
+#### From `db` module:
+```rust
+use kalimantanbio_shared::db::{create_pool, fetch_all_species, fetch_species_by_id};
+```
+
+- `create_pool(database_url: &str) -> Result<Pool<Postgres>>` - Membuat connection pool
+- `fetch_all_species(pool: &Pool<Postgres>) -> Result<Vec<Species>>` - Fetch semua spesies
+- `fetch_species_by_id(pool: &Pool<Postgres>, id: u64) -> Result<Option<Species>>` - Fetch spesies by ID
+
+**Digunakan di**: Tahap 5 (Integrasi API Axum)
+
+### 2.3 Module-Specific Types
+
+Modul ini mendefinisikan tipe tambahan yang spesifik untuk relationship exploration:
+
+```rust
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum AttributeKind { Taxonomy, Habitat, Characteristic }
 
@@ -76,7 +119,7 @@ struct ScoreWeights {
 
 #[derive(Debug, Clone)]
 struct RelationshipQuery {
-    species_id: SpeciesId,
+    species_id: u64,
     min_score: f64,
     limit: usize,
     required_basis: Option<AttributeKind>,
@@ -98,6 +141,106 @@ struct RelationshipScore {
 
 #[derive(Debug, Clone)]
 struct RelatedSpecies {
+    species: Species,
+    score: RelationshipScore,
+    explanations: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+struct NetworkNode {
+    id: u64,
+    label: String,
+    is_center: bool,
+}
+
+#[derive(Debug, Clone)]
+struct NetworkEdge {
+    source: u64,
+    target: u64,
+    score: RelationshipScore,
+    explanations: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+struct SpeciesNetwork {
+    nodes: Vec<NetworkNode>,
+    edges: Vec<NetworkEdge>,
+}
+
+#[derive(Debug, Clone)]
+struct ExplorerResult {
+    center_id: u64,
+    related: Vec<RelatedSpecies>,
+    network: SpeciesNetwork,
+    weights: ScoreWeights,
+    scoring_version: String,
+}
+```
+
+### 2.4 Cargo.toml Dependency
+
+```toml
+[dependencies]
+kalimantanbio-shared = { path = "../shared" }
+serde = { workspace = true }
+tokio = { workspace = true }
+```
+
+### 2.5 Integration Example
+
+```rust
+use kalimantanbio_shared::{
+    core::{Species, Taxonomy},
+    taxonomy::calculate_taxonomy_similarity,
+    collections::jaccard_similarity,
+    scoring::combine_weighted_scores,
+    validation::validate_weights_sum_to_one,
+};
+use std::collections::HashSet;
+
+pub fn calculate_relationship(
+    a: &Species,
+    b: &Species,
+    habitats_a: &HashSet<String>,
+    habitats_b: &HashSet<String>,
+    weights: &ScoreWeights,
+) -> Result<RelationshipScore, ValidationError> {
+    // Validasi bobot menggunakan shared library
+    validate_weights_sum_to_one(
+        &[weights.taxonomy, weights.habitat, weights.characteristic],
+        1e-9
+    )?;
+    
+    // Hitung skor taksonomi menggunakan shared library
+    let taxonomy_score = calculate_taxonomy_similarity(&a.taxonomy, &b.taxonomy);
+    
+    // Hitung skor habitat menggunakan shared library
+    let habitat_score = jaccard_similarity(habitats_a, habitats_b);
+    
+    // Gabungkan skor menggunakan shared library
+    let total = combine_weighted_scores(&[
+        (taxonomy_score, weights.taxonomy),
+        (habitat_score, weights.habitat),
+    ]);
+    
+    // Build RelationshipScore (module-specific)
+    Ok(RelationshipScore {
+        total,
+        coverage: calculate_coverage(&weights, &[taxonomy_score, habitat_score]),
+        evidence: collect_evidence(a, b),
+    })
+}
+```
+
+---
+
+## 3. Struktur Data (Domain Model)
+
+### 3.1 Tipe dari Shared Library
+
+Modul ini menggunakan `Species` dan `Taxonomy` dari shared library. Lihat [MASTERPLAN.md](../MASTERPLAN.md) untuk definisi lengkap.
+
+> **Catatan:** Struktur data sudah distandardisasi di shared library dan digunakan oleh semua modul. Tidak boleh ada modifikasi pada tipe ini tanpa koordinasi dengan project lead.
     species: Species,
     score: RelationshipScore,
     explanations: Vec<String>,
