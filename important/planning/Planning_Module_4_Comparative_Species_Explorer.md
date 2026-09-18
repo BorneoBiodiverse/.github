@@ -265,7 +265,7 @@ Mengambil data spesies dari source data (production database via shared library 
 | `fetch_observations_for_species` | **FROM SHARED LIBRARY**: `kalimantanbio_shared::db::fetch_observations_for_species` | Mengambil semua data observasi untuk satu spesies. Mengembalikan slice kosong jika tidak ada observasi. |
 | `build_kabupaten_set` | `fn build_kabupaten_set(observations: &[&Observation]) -> std::collections::HashSet<u64>` | **MODULE-SPECIFIC**: Mengekstrak set unik `kabupaten_id` dari observasi suatu spesies menggunakan `.map().collect()`. |
 
-**Person in Charge:** **(isi nama anggota)**
+**Person in Charge:** **Anggota 1 — Data retrieval & query validation (nama menyusul).**
 
 ---
 
@@ -280,7 +280,7 @@ Membangun matriks atribut per spesies sebagai representasi terstruktur dari seti
 | `build_attribute_matrix` | `fn build_attribute_matrix(species_list: &[&Species], all_observations: &[Observation]) -> Vec<SpeciesAttributeRow>` | **MODULE-SPECIFIC**: Menerapkan `build_attribute_row` ke setiap spesies menggunakan `.map().collect()` untuk menghasilkan matriks atribut lengkap. |
 | `extract_attribute_values` | `fn extract_attribute_values(matrix: &[SpeciesAttributeRow], key: &str) -> Vec<String>` | **MODULE-SPECIFIC**: Mengekstrak nilai satu atribut tertentu (mis. `"iucn"`, `"species_type"`) dari seluruh baris matriks, untuk digunakan pada analisis kesamaan dan perbedaan. |
 
-**Person in Charge:** **(isi nama anggota)**
+**Person in Charge:** **Anggota 2 — Attribute matrix construction & extraction (nama menyusul).**
 
 ---
 
@@ -295,7 +295,7 @@ Menganalisis matriks atribut untuk menemukan atribut yang sama di semua spesies,
 | `find_unique_attributes` | `fn find_unique_attributes(matrix: &[SpeciesAttributeRow]) -> Vec<String>` | Menemukan atribut yang nilainya hanya dimiliki tepat satu spesies dalam kumpulan yang dibandingkan. Hasilnya dalam format `"species_id:key=value"` (mis. `"123:species_type=Endemic"`). |
 | `find_distinguishing_characteristics` | `fn find_distinguishing_characteristics(matrix: &[SpeciesAttributeRow]) -> Vec<String>` | Mengidentifikasi atribut dengan variasi terbesar antarspesies — yaitu atribut paling membedakan. Diprioritaskan: iucn > species_type > family > order > class > phylum. Hasilnya berupa deskripsi teks (mis. `"iucn: CR vs LC vs VU"`). |
 
-**Person in Charge:** **(isi nama anggota)**
+**Person in Charge:** **Anggota 3 — Shared/unique attribute & distinguishing analysis (nama menyusul).**
 
 ---
 
@@ -315,7 +315,7 @@ Menghitung skor kemiripan untuk setiap pasang spesies yang dibandingkan berdasar
 | `calculate_all_pairs` | `fn calculate_all_pairs(species_list: &[&Species], observations_map: &std::collections::HashMap<u64, std::collections::HashSet<u64>>, weights: &ScoringWeights) -> Vec<SimilarityScore>` | **MODULE-SPECIFIC**: Menghasilkan semua kombinasi pasang spesies (n*(n-1)/2) dan menghitung skor tiap pasang. Menggunakan nested iterator dengan `.enumerate().flat_map()`. |
 | `find_most_similar` | **Uses SHARED `rank_by_score` / `top_n`**: `fn find_most_similar(target_id: u64, scores: &[SimilarityScore]) -> Option<SimilarityScore>` | Menemukan pasang dengan `total_score` tertinggi yang melibatkan `target_id` menggunakan `rank_by_score`/`max_by`. Mengembalikan `None` jika tidak ada pasang yang ditemukan. |
 
-**Person in Charge:** **(isi nama anggota)**
+**Person in Charge:** **Anggota 4 — Similarity scoring & ranking (nama menyusul).**
 
 ---
 
@@ -332,7 +332,7 @@ Menggabungkan seluruh output tahap sebelumnya menjadi `ComparisonResult` lengkap
 | Unit Tests | `mod tests { ... }` | Menguji setiap fungsi dari Tahap 1–4 secara independen menggunakan data dummy `Vec<Species>` dan `Vec<Observation>`. |
 | Pipeline Validation | `cargo test` | Menjalankan seluruh skenario pengujian secara otomatis termasuk edge cases. |
 
-**Person in Charge:** **(isi nama anggota)**
+**Person in Charge:** **Semua anggota — summary generation, pipeline validation, dan end-to-end testing (koordinasi Anggota 1).**
 
 > **Catatan:** Setiap PIC tetap bertanggung jawab terhadap pengujian fungsi yang mereka implementasikan. PIC tahap ini berfokus pada pengujian antar-komponen dan pengujian end-to-end.
 
@@ -468,15 +468,15 @@ Setiap fungsi sebaiknya memiliki satu tanggung jawab yang jelas dan dapat diuji 
 
 ---
 
-## 11. Pembagian Kerja — 5 Anggota
+## 11. Pembagian Kerja — 4 Anggota
 
 | # | Tahap | Fungsi / Tanggung Jawab Utama | PIC | Status |
 | - | --------- | ------------------------------------- | --- | ------------- |
-| 1 | Tahap 1: Data Retrieval & Validation | `validate_query` (via shared `validate_id_list`), `fetch_species_by_ids`, `build_kabupaten_set` (data via shared `fetch_all_species`) | | Belum dimulai |
-| 2 | Tahap 2: Attribute Matrix Construction | `build_attribute_row`, `build_attribute_matrix`, `extract_attribute_values` (taxonomy path via shared `build_taxonomy_path`) | | Belum dimulai |
-| 3 | Tahap 3: Shared & Unique Attribute Analysis | `is_attribute_shared`, `find_shared_attributes`, `find_unique_attributes`, `find_distinguishing_characteristics` | | Belum dimulai |
-| 4 | Tahap 4: Similarity Scoring | `score_conservation`, `score_species_type`, `calculate_all_pairs`, `find_most_similar` (via shared `calculate_taxonomy_similarity`, `jaccard_similarity`, `combine_weighted_scores`) | | Belum dimulai |
-| 5 | Tahap 5: Integration & Testing | `generate_summary`, `compare_species`, unit tests, pipeline validation | | Belum dimulai |
+| 1 | Tahap 1: Data Retrieval & Validation | `validate_query` (via shared `validate_id_list`), `fetch_species_by_ids`, `build_kabupaten_set` (data via shared `fetch_all_species`) | Anggota 1 | Belum dimulai |
+| 2 | Tahap 2: Attribute Matrix Construction | `build_attribute_row`, `build_attribute_matrix`, `extract_attribute_values` (taxonomy path via shared `build_taxonomy_path`) | Anggota 2 | Belum dimulai |
+| 3 | Tahap 3: Shared & Unique Attribute Analysis | `is_attribute_shared`, `find_shared_attributes`, `find_unique_attributes`, `find_distinguishing_characteristics` | Anggota 3 | Belum dimulai |
+| 4 | Tahap 4: Similarity Scoring | `score_conservation`, `score_species_type`, `calculate_all_pairs`, `find_most_similar` (via shared `calculate_taxonomy_similarity`, `jaccard_similarity`, `combine_weighted_scores`) | Anggota 4 | Belum dimulai |
+| 5 | Tahap 5: Integration & Testing | `generate_summary`, `compare_species`, unit tests, pipeline validation — **dikerjakan bersama seluruh anggota** (koordinasi Anggota 1) | Seluruh anggota | Belum dimulai |
 
 > **Catatan:** Fungsi `build_taxonomy_path`, `calculate_taxonomy_similarity`, `jaccard_similarity`, `combine_weighted_scores`, `rank_by_score`, `validate_id_list`, `fetch_all_species`, dan `fetch_observations_for_species` berasal dari **shared library** (`kalimantanbio-shared`) dan **tidak perlu diimplementasikan** di modul ini.
 
@@ -522,7 +522,7 @@ Prinsip yang digunakan:
 * Modul dapat diuji secara mandiri menggunakan data dummy `Vec<Species>` dan `Vec<Observation>`, tanpa harus terkoneksi ke database.
 * Modul hanya bergantung pada **shared library** (`kalimantanbio-shared`) untuk tipe data dan fungsi umum.
 * Gunakan shared concepts (`Species`, `Taxonomy`) sebagai data convention yang disetujui bersama.
-* Integrasi dengan modul lain bersifat opsional — misalnya hasil pencarian Modul 1 dapat digunakan sebagai input `species_ids` ke Modul 4.
+* Integrasi dengan modul lain bersifat opsional — misalnya hasil pencarian Modul 1 dapat digunakan sebagai input `species_ids` ke Modul 4 melalui interface publik (`pub fn`) yang dikomposisikan di lapisan aplikasi (lihat Bagian 17.4).
 * Jangan mengasumsikan dependency terhadap modul lain tanpa kebutuhan teknis yang jelas.
 
 ```text
@@ -556,6 +556,8 @@ Modul dianggap siap untuk tahap akhir apabila:
 * [ ] Tidak terdapat dependency yang tidak diperlukan (tidak bergantung langsung ke Modul 1, 2, 3, atau 5).
 * [ ] Tidak terdapat state global yang tidak diperlukan.
 * [ ] Dokumentasi fungsi dan struktur data tersedia.
+* [ ] Interface publik (`pub fn compare_species`) didefinisikan jelas dan teruji — lihat Bagian 17.
+* [ ] Seluruh `pub fn` memiliki dokumentasi rustdoc lengkap.
 * [ ] Terdapat demonstrasi penggunaan modul (contoh query dengan 2-3 spesies dan hasilnya).
 * [ ] Modul dapat dijalankan secara independen.
 
@@ -708,4 +710,113 @@ Some(SimilarityScore { ... total_score: <nilai tertinggi yang melibatkan id=1> }
 12. Gabungkan seluruh tahap ke dalam pipeline `compare_species()`.
 13. Lakukan pengujian end-to-end menggunakan data dummy dan kemudian data production (via shared library).
 14. Dokumentasikan hasil dan contoh penggunaan modul.
-15. Review akhir sebelum modul dianggap selesai.
+15. Review akhir sebelum modul dianggap selesai, termasuk kelengkapan rustdoc pada seluruh `pub fn`.
+
+---
+
+## 17. Interface Publik & Komunikasi Antar Modul
+
+Bagian ini menjelaskan batas `mod` dan `pub fn` Modul 4 sebagai bukti pemenuhan aspek **Komunikasi Antar Module** pada rubrik penilaian (40%).
+
+### 17.1 Batas Modul (Owns / Does Not Own / Internal / Public)
+
+| Aspek | Isi |
+| --- | --- |
+| **Owns** | Validasi query perbandingan, konstruksi matriks atribut, analisis shared/unique/distinguishing, similarity scoring multi-dimensi, dan ringkasan perbandingan. |
+| **Does Not Own** | Data spesies/observasi/taksonomi (shared library), pencarian spesies (M1), relasi antarspesies (M2), analisis taksonomi mendalam (M3), publikasi (M5). |
+| **Internal** | `fetch_species_by_ids`, `fetch_observations_for_species`, `build_attribute_row`, `build_attribute_matrix`, `extract_attribute_values`, `is_attribute_shared`, `find_shared_attributes`, `find_unique_attributes`, `find_distinguishing_characteristics`, `best_score`, `score_conservation`, `score_species_type`, `score_distribution`, `calculate_all_pairs`, `find_most_similar`, `generate_summary`. |
+| **Publicly Exposes** | `compare_species` (main) dan `calculate_pair_similarity` (pasangan, opsional) — kapabilitas yang dapat digunakan Axum handler maupun modul lain. |
+
+### 17.2 Fungsi Publik (`pub fn`) — Modul 4
+
+| `pub fn` | Provider | Consumer Potensial | Purpose | Input | Output | Why Needed |
+| --- | --- | --- | --- | --- | --- | --- |
+| `compare_species` | Modul 4 | Axum handler `/api/v1/compare` | Pipeline utama Tahap 1–5 | `&ComparisonQuery`, globals | `Result<ComparisonResult, ModuleError>` | Kapabilitas utama modul untuk aplikasi dan modul lain. |
+| `calculate_pair_similarity` *(sudah `pub` di contoh)* | Modul 4 | Internal `calculate_all_pairs`; opsional publik untuk modul lain | Menghitung skor kesamaan sepasang spesies | dua spesies + observasi | `SimilarityScore` | Hitungan inti yang dapat diuji dan digunakan ulang. |
+
+```rust
+/// Membandingkan beberapa spesies sekaligus.
+///
+/// # Arguments
+///
+/// * `query` - Query perbandingan (daftar species_ids yang sudah divalidasi).
+/// * `fetch_species` / `fetch_observations` - Adapter data (dari shared library).
+///
+/// # Returns
+///
+/// Atribut bersama, atribut unik, karakteristik pembeda, skor kesamaan, dan ringkasan.
+pub fn compare_species(
+    query: &ComparisonQuery,
+    species: &[Species],
+    observations: &[Observation],
+) -> Result<ComparisonResult, ModuleError>
+```
+
+### 17.3 Visibilitas Fungsi
+
+| Fungsi | Visibilitas | Lapisan | Konsumen |
+| --- | --- | --- | --- |
+| `fetch_species_by_ids`, `fetch_observations_for_species`, `build_attribute_row`, `build_attribute_matrix`, `extract_attribute_values` | private | Internal helper (module-specific) | Pipeline |
+| `is_attribute_shared`, `find_shared_attributes`, `find_unique_attributes`, `find_distinguishing_characteristics` | private | Internal helper (module-specific) | Pipeline |
+| `best_score`, `score_conservation`, `score_species_type`, `score_distribution` | private | Internal helper (module-specific) | `calculate_pair_similarity` |
+| `calculate_all_pairs`, `find_most_similar`, `generate_summary` | private | Internal helper (module-specific) | Pipeline |
+| `calculate_pair_similarity` | `pub fn` | Module API (opsional) | Internal; opsional modul lain |
+| `compare_species` | `pub fn` | Module API | Axum handler; opsional modul lain |
+
+### 17.4 Komunikasi Antar Modul (Provider → Receiver)
+
+```text
+Modul 4 (Provider)
+      │
+      │ pub fn compare_species(...)
+      ▼
+Axum handler /api/v1/compare  (Receiver / Aplikasi)
+      │  hasil: ComparisonResult
+      ▼
+Django API → Frontend
+```
+
+Hubungan opsional (interface publik, bukan dependency crate):
+
+```text
+Modul 1 ──species_ids──▶ Modul 4 (RECEIVER dari hasil pencarian, opsional)
+Modul 2 ──species_ids──▶ Modul 4 (penerusan ID untuk perbandingan, opsional)
+Modul 3 ──DiversityStats─▶ Modul 4 (konteks keanekaragaman, opsional)
+```
+
+| Provider | `pub fn` | Receiver | Purpose | Data yang Dikirim | Priority |
+| --- | --- | --- | --- | --- | --- |
+| Modul 4 | `compare_species` | Axum handler | Respons API perbandingan | `ComparisonQuery` | **Required** (API) |
+| Modul 1 | `search` | Modul 4 | Kandidat species_ids untuk perbandingan | `Vec<(&Species, f64)>` → species_ids | Optional |
+| Modul 2 | `explore_relationships` | Modul 4 | Penerusan ID spesies untuk perbandingan | species_ids | Optional |
+| Modul 3 | `calculate_diversity` | Modul 4 | Statistik keanekaragaman sebagai konteks | `DiversityStats` | Optional |
+
+> **Selama pengembangan paralel:** Modul 4 menerima input `species_ids`; asal ID dapat berupa input manual pengguna, hasil Modul 1, atau hasil Modul 2. Selama Modul 1/2 belum siap, modul memakai **mock** atau input langsung. Modul 4 tidak bergantung pada implementasi internal modul lain.
+
+### 17.5 Rustdoc — Modul 4
+
+Rustdoc diwajibkan untuk **seluruh `pub fn`** dan **seluruh tipe publik** modul ini:
+
+* `compare_species`, `calculate_pair_similarity`.
+* Tipe publik yang muncul di signature `pub fn` (mis. `ComparisonQuery`, `ComparisonResult`, `SimilarityScore`, `AttributeRow`, `ComparisonError`).
+
+Command verifikasi:
+
+```bash
+cargo doc --workspace --no-deps --open
+cargo check
+cargo test
+```
+
+Status saat ini di dokumen: **Rustdoc planned** (belum diklaim verified).
+
+---
+
+## 18. Rubrik — Evidence Modul 4
+
+| Rubrik | Evidence di Planning Modul 4 | Bukti Implementasi yang Masih Diperlukan |
+| --- | --- | --- |
+| Repositori Github (15%) | Lokasi `crates/species-comparison` dan command build/test/rustdoc | Repositori dibuat & diakses dosen |
+| Prioritas Modul (25%) | Prioritas fitur: validasi → matriks → shared/unique → similarity → similar-species | Implementasi fitur prioritas |
+| Rustdoc (20%) | Rustdoc diwajibkan untuk semua `pub fn` (Bagian 17.5) | Generate & aksesibel |
+| Komunikasi Antar Module (40%) | Batas `mod`/`pub fn` (17.1–17.2), visibilitas (17.3), matriks komunikasi (17.4) termasuk relasi M1/M2/M3 dari Bagian 13 | Interface diimplementasikan & diuji |

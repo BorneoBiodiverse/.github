@@ -369,7 +369,8 @@ Prinsip yang digunakan:
 * Modul dapat dikembangkan secara mandiri, terlepas dari status Modul 2–5.
 * Modul dapat diuji secara mandiri menggunakan shared fixtures (`shared/fixtures/species.json`), tanpa harus selalu terkoneksi ke production database.
 * Modul tidak boleh bergantung pada implementasi internal modul lain.
-* Integrasi dengan modul lain bersifat opsional dan melalui unified Axum API server.
+* Modul hanya mengekspos **interface publik (`pub fn`)** yang dibutuhkan — lihat Bagian 17.
+* Integrasi dengan modul lain bersifat opsional dan melalui unified Axum API server (aplikasi). Receiver memakai mock selama pengembangan paralel.
 * **Semua modul bergantung HANYA pada shared library**, bukan pada modul lain.
 
 ```text
@@ -404,6 +405,8 @@ Prinsip yang digunakan:
 * [ ] Terdapat demonstrasi penggunaan modul (mis. contoh query & hasilnya).
 * [ ] Modul dapat dijalankan secara independen menggunakan shared fixtures.
 * [ ] Integrasi dengan shared library berfungsi dengan baik.
+* [ ] Interface publik (`pub fn search`) didefinisikan jelas dan teruji — lihat Bagian 17.
+* [ ] Seluruh `pub fn` memiliki dokumentasi rustdoc lengkap.
 
 ---
 
@@ -482,3 +485,137 @@ Daftar spesies dengan iucn == "CR", diurutkan berdasarkan skor relevansi.
 - Merencanakan module-specific logic
 - Menyiapkan test scenarios
 - Membagi tugas antar anggota
+
+---
+
+## 17. Interface Publik & Komunikasi Antar Modul
+
+Bagian ini menjelaskan batas `mod` dan `pub fn` Modul 1 sebagai bukti pemenuhan aspek **Komunikasi Antar Module** pada rubrik penilaian (40%).
+
+### 17.1 Batas Modul (Owns / Does Not Own / Internal / Public)
+
+| Aspek | Isi |
+| --- | --- |
+| **Owns** | Parsing query bahasa natural, filtering multi-atribut, relevance scoring, dan rekomendasi query lanjutan untuk pencarian spesies. |
+| **Does Not Own** | Data spesies/taksonomi (shared library + database), visualisasi jaringan (M2), hierarki taksonomi mendalam (M3), perbandingan spesies (M4), dan eksplorasi publikasi (M5). |
+| **Internal** | `normalize_text`/`tokenize` (panggilan shared), `extract_filters`, `matches_*`, `filter_species`, `score_*`, dan seluruh fungsi rekomendasi. |
+| **Publicly Exposes** | `search` (main) dan `recommend_related_queries` (opsional) — dua kapabilitas yang dapat digunakan Axum handler maupun modul lain. |
+
+### 17.2 Fungsi Publik (`pub fn`) — Modul 1
+
+| `pub fn` | Provider | Consumer Potensial | Purpose | Input | Output | Why Needed |
+| --- | --- | --- | --- | --- | --- | --- |
+| `search` | Modul 1 | Axum handler `/api/v1/search`; opsional M2 (memilih spesies pusat), M4 (kandidat species_ids), M5 (cakupan publikasi) | Menemukan & mengurutkan spesies relevan | `raw_query: &str`, `all_species: &[Species]` | `Vec<(&Species, f64)>` | Kapabilitas utama modul; dipakai API dan modul lain sebagai pintu masuk DISCOVER. |
+| `recommend_related_queries` *(komposisi dari fungsi rekomendasi existing)* | Modul 1 | Axum handler `/api/v1/search/recommendations` (opsional) | Menghasilkan rekomendasi query lanjutan | `raw_query: &str`, `all_species: &[Species]` | `Vec<(String, f64)>` | Mengekspos kapabilitas rekomendasi modul sebagai satu fungsi yang dapat dipanggil. |
+
+```rust
+/// Mencari spesies menggunakan query bahasa natural atau filter terstruktur.
+///
+/// # Arguments
+///
+/// * `raw_query` - Query pengguna (mis. "orangutan kalimantan" atau "iucn:CR").
+/// * `all_species` - Seluruh data spesies dari shared library.
+///
+/// # Returns
+///
+/// Daftar spesies terurut berdasarkan skor relevansi (tertinggi dulu).
+///
+/// # Example
+///
+/// ```
+/// let results = search("orangutan kalimantan", &all_species);
+/// ```
+pub fn search(raw_query: &str, all_species: &[Species]) -> Vec<(&Species, f64)>
+```
+
+### 17.3 Visibilitas Fungsi
+
+| Fungsi | Visibilitas | Lapisan | Konsumen |
+| --- | --- | --- | --- |
+| `normalize_text`, `tokenize`, `calculate_taxonomy_similarity`, `combine_weighted_scores`, `rank_by_score`, `fetch_all_species`, `create_pool` | `pub` (shared library) | Shared | Dipanggil internal oleh pipeline modul |
+| `extract_filters` | private | Internal helper (module-specific) | Pipeline `search` |
+| `matches_free_text`, `matches_taxonomy`, `matches_conservation`, `matches_species_type`, `filter_species` | private | Internal helper (module-specific) | Pipeline `search` |
+| `score_text_match`, `score_taxonomy_match`, `score_conservation_match`, `score_species` | private | Internal helper (module-specific) | Pipeline `search` |
+| `extract_common_attributes`, `generate_candidate_queries`, `score_query_candidate`, `rank_related_queries` | private | Internal helper (module-specific) | Wrapper `recommend_related_queries` |
+| `search` | `pub fn` | Module API | Axum handler; opsional M2/M4/M5 |
+| `recommend_related_queries` | `pub fn` | Module API (opsional) | Axum handler; opsional modul lain |
+
+> Aturan: fungsi pembantu (helper) tetap **private**. Hanya kapabilitas bermakna yang diekspos sebagai `pub fn`. Axum HTTP handler hidup di crate `api-server`, bukan di crate modul.
+
+### 17.4 Komunikasi Antar Modul (Provider → Receiver)
+
+```text
+Module 1 (Provider)
+      │
+      │ pub fn search(...)
+      ▼
+Axum handler /api/v1/search  (Receiver / Aplikasi)
+      │  hasil: Vec<(&Species, f64)>
+      ▼
+Django API → Frontend
+```
+
+Hubungan opsional dengan modul lain (melalui **interface publik**, dikomposisikan di aplikasi `api-server`, bukan dependency crate):
+
+```text
+Modul 1 ──search results──▶ Modul 2 (spesies pusat, opsional)
+Modul 1 ──species_ids──────▶ Modul 4 (kandidat perbandingan, opsional)
+Modul 1 ──species scope────▶ Modul 5 (cakupan pencarian publikasi, opsional)
+```
+
+| Provider | `pub fn` | Receiver | Purpose | Data yang Dikirim | Priority |
+| --- | --- | --- | --- | --- | --- |
+| Modul 1 | `search` | Axum handler | Disimpan hasil pencarian untuk respons API | Query + semua spesies | **Required** (API) |
+| Modul 1 | `search` | Modul 4 | Kandidat species_ids untuk perbandingan | `Vec<(&Species, f64)>` → species_ids | Optional |
+| Modul 1 | `search` | Modul 2 | Spesies pusat untuk eksplorasi relasi | species (satu) | Optional |
+| Modul 1 | `search` | Modul 5 | Cakupan spesies untuk eksplorasi publikasi | species_ids | Optional |
+
+> **Selama pengembangan paralel:** Receiver (M2/M4/M5) boleh menggunakan **mock** hasil `search`. Setelah integrasi, mock diganti implementasi nyata melalui `pub fn` yang sama. Modul 1 tidak pernah mengonsumsi fungsi modul lain.
+
+### 17.5 Contoh Komposisi di Lapisan Aplikasi (Axum handler)
+
+```rust
+// crates/api-server/src/routes/compare.rs (HYBRID)
+async fn compare_from_search(query: Query<SearchAndCompare>) -> Json<Response> {
+    // Modul 1: temukan kandidat (dikomposisikan di aplikasi, bukan dependency crate M4→M1)
+    let results = species_search::search(&query.q, &all_species);
+    let ids: Vec<u64> = results.into_iter().take(3).map(|(s, _)| s.id).collect();
+    // Modul 4: bandingkan kandidat
+    let comparison = species_comparison::compare_species(
+        &ComparisonQuery { species_ids: ids },
+        &all_species,
+        &all_observations,
+        &weights,
+    )?;
+    Json(Response::success(comparison))
+}
+```
+
+### 17.6 Rustdoc — Modul 1
+
+Rustdoc diwajibkan untuk **seluruh `pub fn`** dan **seluruh tipe publik** modul ini:
+
+* `search` — lengkap dengan `# Arguments`, `# Returns`, dan contoh penggunaan.
+* `recommend_related_queries` (jika diekspos) — deskripsi, parameter, dan contoh.
+* Tipe publik yang muncul di signature `pub fn` (mis. `QueryFilters` jika diekspor ke modul lain).
+
+Command verifikasi:
+
+```bash
+cargo doc --workspace --no-deps --open
+cargo check
+cargo test
+```
+
+Status saat ini di dokumen: **Rustdoc planned** (rutin dihasilkan setelah fungsi diimplementasikan, belum diklaim verified).
+
+---
+
+## 18. Rubrik — Evidence Modul 1
+
+| Rubrik | Evidence di Planning Modul 1 | Bukti Implementasi yang Masih Diperlukan |
+| --- | --- | --- |
+| Repositori Github (15%) | Lokasi `crates/species-search` dan command build/test/rustdoc | Repositori dibuat & diakses dosen |
+| Prioritas Modul (25%) | Prioritas fitur awal: parsing → filter → scoring → rekomendasi | Implementasi fitur prioritas |
+| Rustdoc (20%) | Rustdoc diwajibkan untuk semua `pub fn` (Bagian 17.6) | Generate & aksesibel |
+| Komunikasi Antar Module (40%) | Batas `mod`/`pub fn` (17.1–17.2), visibilitas (17.3), matriks komunikasi (17.4) | Interface diimplementasikan & diuji |

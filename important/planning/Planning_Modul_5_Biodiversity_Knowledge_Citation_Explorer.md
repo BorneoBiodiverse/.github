@@ -473,7 +473,8 @@ Prinsip yang digunakan:
 * Modul hanya bergantung pada **shared library** (`kalimantanbio-shared`) untuk tipe data (`Species`) dan fungsi umum (`normalize_text`, `build_timeline`, `count_by_key`, `calculate_coverage_percentage`, `rank_by_score`).
 * Publikasi ilmiah dimodelkan sebagai data milik modul ini; `Species` dari shared library digunakan untuk mencocokkan publikasi dengan spesies.
 * Tidak ada ketergantungan pada implementasi internal Modul 1, 2, 3, atau 4.
-* Integrasi dengan modul lain bersifat opsional dan dilakukan melalui interface yang telah disepakati.
+* Modul hanya mengekspos **interface publik (`pub fn`)** yang dibutuhkan — lihat Bagian 17.
+* Integrasi dengan modul lain bersifat opsional dan dilakukan melalui interface yang telah disepakati, dikomposisikan di lapisan aplikasi (Axum api-server) bukan sebagai dependency crate.
 
 ## 14. Kriteria Selesai Modul
 
@@ -489,6 +490,8 @@ Prinsip yang digunakan:
 * [ ] Citation export mendukung minimal APA dan BibTeX.
 * [ ] Knowledge network menghasilkan node dan edge yang valid.
 * [ ] Setiap fungsi inti memiliki unit test.
+* [ ] Interface publik (`pub fn explore_knowledge`) didefinisikan jelas dan teruji — lihat Bagian 17.
+* [ ] Seluruh `pub fn` memiliki dokumentasi rustdoc lengkap.
 * [ ] Pipeline dapat berjalan tanpa service eksternal menggunakan dummy fixture.
 * [ ] Adapter sumber publikasi dapat diuji secara terpisah dari fungsi murni.
 
@@ -551,4 +554,116 @@ Prinsip yang digunakan:
 13. Gabungkan seluruh tahap ke dalam pipeline `explore_knowledge()`.
 14. Lakukan pengujian end-to-end menggunakan data dummy dan kemudian data production (via shared library).
 15. Dokumentasikan hasil dan contoh penggunaan modul.
-16. Review akhir sebelum modul dianggap selesai.
+16. Review akhir sebelum modul dianggap selesai, termasuk kelengkapan rustdoc pada seluruh `pub fn`.
+
+---
+
+## 17. Interface Publik & Komunikasi Antar Modul
+
+Bagian ini menjelaskan batas `mod` dan `pub fn` Modul 5 sebagai bukti pemenuhan aspek **Komunikasi Antar Module** pada rubrik penilaian (40%).
+
+### 17.1 Batas Modul (Owns / Does Not Own / Internal / Public)
+
+| Aspek | Isi |
+| --- | --- |
+| **Owns** | Data `Publication`, parsing/normalisasi/deduplikasi, eksplorasi spesies→publikasi, eksplorasi topik/lokasi, timeline, coverage, understudied species, citation recommendation, citation export, dan knowledge network. |
+| **Does Not Own** | Data `Species` (shared library), pencarian spesies (M1), relasi antarspesies (M2), taksonomi (M3), perbandingan (M4). |
+| **Internal** | `parse_publications`, `normalize_publication`, `validate_publication`, `deduplicate_publications`, `build_species_index`, `publications_for_species/topic/taxon/location`, `query_publications`, `build_research_timeline`, `calculate_topic_distribution`, `calculate_location_distribution`, `calculate_entity_coverage`, `find_understudied_species`, `calculate_coverage_score`, `score_publication_relevance`, `rank_publications`, `format_apa`, `format_bibtex`, `build_knowledge_graph`, `related_publications`. |
+| **Publicly Exposes** | `explore_knowledge` (main), `recommend_citations` (opsional), dan `export_citations` (opsional) — kapabilitas yang dapat digunakan Axum handler maupun modul lain. |
+
+### 17.2 Fungsi Publik (`pub fn`) — Modul 5
+
+| `pub fn` | Provider | Consumer Potensial | Purpose | Input | Output | Why Needed |
+| --- | --- | --- | --- | --- | --- | --- |
+| `explore_knowledge` | Modul 5 | Axum handler `/api/v1/knowledge/*` | Entry point pipeline Tahap 1–5 | query (spesies/topik/lokasi), dataset publikasi | `Result<KnowledgeReport, ModuleError>` | Kapabilitas utama modul untuk aplikasi dan modul lain. |
+| `recommend_citations` *(opsional)* | Modul 5 | Axum handler `/api/v1/knowledge/citations` | Merekomendasikan publikasi relevan | query, publikasi | `Vec<Publication>` terurut | Rekomendasi sitasi untuk pengguna/modul lain. |
+| `export_citations` *(opsional)* | Modul 5 | Axum handler `/api/v1/knowledge/export` | Menyusun string APA dan BibTeX | daftar publikasi | `CitationExport` | Membuka konsumsi sitasi ke luar sistem. |
+
+```rust
+/// Menjelajahi pengetahuan dan sitasi terkait spesies/topik/lokasi.
+///
+/// # Arguments
+///
+/// * `query` - Kriteria eksplorasi (spesies, topik, lokasi, tahun).
+/// * `publications` - Dataset publikasi dari adapter/fixture.
+///
+/// # Returns
+///
+/// Publikasi, timeline, distribusi, coverage, dan understudied species.
+pub fn explore_knowledge(
+    query: &KnowledgeQuery,
+    publications: &[Publication],
+) -> Result<KnowledgeReport, ModuleError>
+```
+
+### 17.3 Visibilitas Fungsi
+
+| Fungsi | Visibilitas | Lapisan | Konsumen |
+| --- | --- | --- | --- |
+| `parse_publications`, `normalize_publication`, `validate_publication`, `deduplicate_publications` | private | Internal helper (module-specific) | Pipeline |
+| `build_species_index`, `publications_for_species/topic/taxon/location`, `query_publications` | private | Internal helper (module-specific) | Pipeline |
+| `build_research_timeline`, `calculate_topic_distribution`, `calculate_location_distribution`, `calculate_entity_coverage`, `find_understudied_species`, `calculate_coverage_score` | private | Internal helper (module-specific) | Pipeline |
+| `score_publication_relevance`, `rank_publications` | private | Internal helper (module-specific) | `recommend_citations` |
+| `format_apa`, `format_bibtex` | private | Internal helper (module-specific) | `export_citations` |
+| `build_knowledge_graph`, `related_publications` | private | Internal helper (module-specific) | Pipeline |
+| `recommend_citations` | `pub fn` | Module API (opsional) | Axum handler; opsional modul lain |
+| `export_citations` | `pub fn` | Module API (opsional) | Axum handler; opsional modul lain |
+| `explore_knowledge` | `pub fn` | Module API | Axum handler; opsional modul lain |
+
+### 17.4 Komunikasi Antar Modul (Provider → Receiver)
+
+```text
+Modul 5 (Provider)
+      │
+      │ pub fn explore_knowledge(...)
+      ▼
+Axum handler /api/v1/knowledge/*  (Receiver / Aplikasi)
+      │  hasil: KnowledgeReport
+      ▼
+Django API → Frontend
+```
+
+Hubungan opsional (interface publik, bukan dependency crate):
+
+```text
+Modul 1 ──species scope──▶ Modul 5 (RECEIVER dari hasil pencarian, opsional)
+Modul 2 ──species_ids────▶ Modul 5 (membuka referensi spesies, opsional)
+Modul 3 ──GapReport──────▶ Modul 5 (spesies understudied, opsional)
+```
+
+| Provider | `pub fn` | Receiver | Purpose | Data yang Dikirim | Priority |
+| --- | --- | --- | --- | --- | --- |
+| Modul 5 | `explore_knowledge` | Axum handler | Respons API eksplorasi pengetahuan | `KnowledgeQuery` | **Required** (API) |
+| Modul 1 | `search` | Modul 5 | Cakupan spesies untuk eksplorasi publikasi | species_ids | Optional |
+| Modul 2 | `explore_relationships` | Modul 5 | Membuka referensi spesies pada relasi | species_ids | Optional |
+| Modul 3 | `analyze_taxonomic_gap` | Modul 5 | Spesies understudied untuk prioritas riset | `GapReport` | Optional |
+
+> **Selama pengembangan paralel:** Modul 5 dapat berjalan berdasarkan `KnowledgeQuery` mandiri (spesies/topik/lokasi) dan memakai **mock** hasil Modul 1/2/3 bila dihubungkan. Modul 5 tidak bergantung pada implementasi internal modul lain.
+
+### 17.5 Rustdoc — Modul 5
+
+Rustdoc diwajibkan untuk **seluruh `pub fn`** dan **seluruh tipe publik** modul ini:
+
+* `explore_knowledge`, `recommend_citations`, `export_citations`.
+* Tipe publik yang muncul di signature `pub fn` (mis. `KnowledgeQuery`, `KnowledgeReport`, `Publication`, `ResearchTopic`, `ResearchLocation`, `KnowledgeNetwork`, `CitationExport`).
+
+Command verifikasi:
+
+```bash
+cargo doc --workspace --no-deps --open
+cargo check
+cargo test
+```
+
+Status saat ini di dokumen: **Rustdoc planned** (belum diklaim verified).
+
+---
+
+## 18. Rubrik — Evidence Modul 5
+
+| Rubrik | Evidence di Planning Modul 5 | Bukti Implementasi yang Masih Diperlukan |
+| --- | --- | --- |
+| Repositori Github (15%) | Lokasi `crates/knowledge-citations` dan command build/test/rustdoc | Repositori dibuat & diakses dosen |
+| Prioritas Modul (25%) | Prioritas fitur: species↔publication → topic → location → coverage → understudied | Implementasi fitur prioritas |
+| Rustdoc (20%) | Rustdoc diwajibkan untuk semua `pub fn` (Bagian 17.5) | Generate & aksesibel |
+| Komunikasi Antar Module (40%) | Batas `mod`/`pub fn` (17.1–17.2), visibilitas (17.3), matriks komunikasi (17.4) termasuk relasi M1/M2/M3 dari Bagian 13 | Interface diimplementasikan & diuji |

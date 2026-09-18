@@ -25,6 +25,9 @@
 13. [Testing Strategy](#13-testing-strategy)
 14. [Deployment Strategy](#14-deployment-strategy)
 15. [Risk Management](#15-risk-management)
+16. [Komunikasi Antar Modul (mod & pub fn)](#16-komunikasi-antar-modul-mod--pub-fn)
+17. [Rustdoc](#17-rustdoc)
+18. [Rubrik Penilaian & Verifikasi Dosen](#18-rubrik-penilaian--verifikasi-dosen)
 
 ---
 
@@ -133,6 +136,14 @@ The platform consists of five independent but complementary modules:
 ```
 
 **Key Point**: Modules depend ONLY on `shared` library, never on each other.
+
+**Cross-Module Communication (Hybrid)**:
+
+- Modules remain **independent crates** with no crate-to-crate dependency (no `Cargo.toml` dependency between modules).
+- Each module exposes a small, deliberate set of **`pub fn` entry points** (its module API). All internal helpers stay private.
+- Optional cross-module communication happens through these agreed `pub fn` interfaces, composed at the **application layer** (the unified Axum API server), not through module-level imports.
+- During **parallel development**, a consumer module may rely on **mocks** of a provider's `pub fn` output; the mock is replaced by the real implementation once available.
+- During the project review, unify module definitions through a standard interface at the beginning of the project. In the eyes of the evaluator, each module may act as a **Provider** (exposing `pub fn` output) or a **Receiver** (consuming another module's `pub fn` output) through the API layer. See [Section 16](#16-komunikasi-antar-modul-mod--pub-fn).
 
 ---
 
@@ -760,7 +771,7 @@ All modules can use these fixtures for unit testing without database dependency.
 
 **Crate**: `taxonomy`  
 **Routes**: `/api/v1/taxonomy/*`  
-**Team Size**: 1 member  
+**Team Size**: 5 members  
 
 **Purpose**: Provide interactive exploration of biological taxonomy and classification.
 
@@ -784,7 +795,7 @@ All modules can use these fixtures for unit testing without database dependency.
 
 **Crate**: `species-comparison`  
 **Routes**: `/api/v1/compare`  
-**Team Size**: 5 members  
+**Team Size**: 4 members  
 
 **Purpose**: Enable multi-species comparison to identify similarities, differences, and distinguishing characteristics.
 
@@ -1111,13 +1122,13 @@ let app = Router::new()
 - Implement network data generation
 - Write unit tests
 
-**Module 3 Team (1 member)**:
+**Module 3 Team (5 members)**:
 - Implement data parsing and tree construction
 - Implement diversity analysis
 - Implement gap analysis
 - Write unit tests
 
-**Module 4 Team (5 members)**:
+**Module 4 Team (4 members)**:
 - Implement data retrieval and validation
 - Implement attribute matrix construction
 - Implement shared/unique analysis
@@ -1292,19 +1303,22 @@ Weeks 6-8: Testing & Deployment
 - Network data structures
 - Unit tests and documentation
 
-#### Module 3 Team (1 Member)
+#### Module 3 Team (5 Members)
 **Crate**: `taxonomy`  
 **Responsibilities**:
-- All module functionality (tree, diversity, gaps)
-- Unit tests and documentation
+- Data ingestion and hierarchy validation
+- Taxonomic tree construction and traversal
+- Diversity and endemic analytics
+- Coverage and gap analysis
+- Pipeline integration, unit tests, and documentation
 
-#### Module 4 Team (5 Members)
+#### Module 4 Team (4 Members)
 **Crate**: `species-comparison`  
 **Responsibilities**:
+- Data retrieval and query validation
 - Attribute matrix construction
-- Similarity scoring logic
-- Distinguishing characteristic analysis
-- Unit tests and documentation
+- Shared/unique attribute and distinguishing analysis
+- Similarity scoring, summary generation, unit tests, and documentation
 
 #### Module 5 Team (5 Members)
 **Crate**: `knowledge-citations`  
@@ -1672,6 +1686,134 @@ CMD ["api-server"]
 
 ---
 
+## 16. Komunikasi Antar Modul (mod & pub fn)
+
+Bagian ini merupakan spesifikasi utama untuk aspek **Komunikasi Antar Module** pada rubrik penilaian (40%). Prinsip yang dipakai adalah **Hybrid**: modul tetap independen, komunikasi dilakukan melalui `pub fn` yang disepakati, dikomposisikan di lapisan aplikasi (Axum), dengan dukungan mock selama pengembangan paralel.
+
+### 16.1 Prinsip
+
+1. Setiap modul adalah crate independen yang **hanya bergantung pada `kalimantanbio-shared`**.
+2. Setiap modul mengekspos **sedikit `pub fn`** (module API) sebagai *contract* yang bisa dipakai aplikasi dan modul lain. Semua helper internal tetap **private**.
+3. Tidak ada *mod-to-mod dependency* (`Cargo.toml`). Komunikasi antar modul nyata terjadi melalui komposisi `pub fn` di **Axum api-server** (lapisan aplikasi).
+4. Selama pengembangan paralel, receiver boleh memakai **mock** output provider; setelah integrasi, mock tinggal diganti implementasi nyata. Ini menjaga kelima tim dapat berjalan bersamaan.
+5. Setiap `pub fn` wajib didokumentasikan di rustdoc dengan contoh penggunaan. Lihat [Section 17](#17-rustdoc).
+
+### 16.2 Module Public Interfaces (Ringkasan)
+
+| Module | Crate | `pub fn` Utama (Module API) | Dipanggil oleh |
+| --- | --- | --- | --- |
+| Modul 1 (Search) | `species-search` | `search`, `recommend_related_queries` | Axum `/api/v1/search`; opsional M2/M4/M5 |
+| Modul 2 (Relationships) | `species-relationships` | `explore_relationships`, `calculate_relationship` | Axum `/api/v1/species/:id/relationships`; opsional M4/M5 |
+| Modul 3 (Taxonomy) | `taxonomy` | `generate_taxonomy_report`, `calculate_diversity`, `analyze_taxonomic_gap` | Axum `/api/v1/taxonomy/*`; opsional M2/M4/M5 |
+| Modul 4 (Comparison) | `species-comparison` | `compare_species`, `calculate_pair_similarity` | Axum `/api/v1/compare` |
+| Modul 5 (Knowledge) | `knowledge-citations` | `explore_knowledge`, `recommend_citations`, `export_citations` | Axum `/api/v1/publications`, `/api/v1/citations` |
+
+### 16.3 Communication Matrix (Provider → Receiver)
+
+Semua kolom **Optional** berarti komunikasi opsional yang dikomposisikan di lapisan aplikasi; tidak membentuk dependency antarcrate.
+
+| Provider | `pub fn` | Receiver | Purpose | Data yang Dikirim | Priority |
+| --- | --- | --- | --- | --- | --- |
+| Modul 1 | `search` | Axum handler | Respons pencarian | query + semua spesies | **Required** |
+| Modul 1 | `search` | Modul 4 (aplikasi) | Kandidat species_ids untuk perbandingan | `Vec<(&Species, f64)>` → species_ids | Optional |
+| Modul 1 | `search` | Modul 2 (aplikasi) | Spesies pusat untuk eksplorasi relasi | satu species | Optional |
+| Modul 1 | `search` | Modul 5 (aplikasi) | Cakupan spesies untuk eksplorasi publikasi | species_ids | Optional |
+| Modul 2 | `explore_relationships` | Axum handler | Respons relasi spesies | snapshot + query + weights | **Required** |
+| Modul 2 | `explore_relationships` | Modul 4 (aplikasi) | Penerusan ID spesies untuk perbandingan | species_ids | Optional |
+| Modul 2 | `explore_relationships` | Modul 5 (aplikasi) | Membuka referensi spesies pada relasi | species_ids | Optional |
+| Modul 3 | `generate_taxonomy_report` | Axum handler | Respons taksonomi | `BioDataInput` | **Required** |
+| Modul 3 | `calculate_diversity` | Modul 2/4 (aplikasi) | Statistik keanekaragaman sebagai konteks | `DiversityStats` | Optional |
+| Modul 3 | `analyze_taxonomic_gap` | Modul 5 (aplikasi) | Spesies understudied untuk prioritas riset | `GapReport` | Optional |
+| Modul 4 | `compare_species` | Axum handler | Respons perbandingan | `ComparisonQuery` | **Required** |
+| Modul 5 | `explore_knowledge` | Axum handler | Respons eksplorasi pengetahuan | `KnowledgeQuery` | **Required** |
+| Modul 5 | `recommend_citations` / `export_citations` | Axum handler | Respons rekomendasi/ekspor sitasi | query / publication_ids | **Required** |
+
+> Semua receiver mengonsumsi output provider **melalui `pub fn` di lapisan aplikasi**, kecuali yang ditandai "internal" di dokumen masing-masing modul. Tidak ada modul yang mengimpor crate modul lain.
+
+### 16.4 Model Provider → Receiver
+
+```text
+                      kalimantanbio-shared
+                              │ (satu-satunya dependency crate)
+        ┌──────────┬──────────┼──────────┬──────────┐
+        ▼          ▼          ▼          ▼          ▼
+   Modul 1      Modul 2    Modul 3    Modul 4    Modul 5
+   (Search)   (Relasi)   (Taksonomi) (Banding) (Pengetahuan)
+      │            │          │          │          │
+      └──── pub fn ┴─ contract ┴ composable ┴─────────┘
+                              │
+                             │  (dikomposisikan di sini)
+                             ▼
+                   Axum api-server (aplikasi)
+                              │
+                             ▼
+                    Django API → Frontend
+```
+
+Tim boleh menyepakati kontrak antar modul sejak awal (mis. format `species_ids`), selama kontrak itu tidak menimbulkan dependency crate.
+
+### 16.5 Detail Per Modul
+
+Detail batas `mod`/`pub fn`, tabel visibilitas, dan matriks komunikasi per modul tercantum pada bagian **17. Interface Publik & Komunikasi Antar Modul** dan **18. Rubrik — Evidence** di dokumen planning masing-masing modul:
+
+- [planning-modul1-intelligent-species-search.md](planning/planning-modul1-intelligent-species-search.md)
+- [planning-modul-2-species-relationship-explorer.md](planning/planning-modul-2-species-relationship-explorer.md)
+- [Planning_Modul_3_Taxonomy.md](planning/Planning_Modul_3_Taxonomy.md)
+- [Planning_Module_4_Comparative_Species_Explorer.md](planning/Planning_Module_4_Comparative_Species_Explorer.md)
+- [Planning_Modul_5_Biodiversity_Knowledge_Citation_Explorer.md](planning/Planning_Modul_5_Biodiversity_Knowledge_Citation_Explorer.md)
+
+---
+
+## 17. Rustdoc
+
+### 17.1 Requirement
+
+- **Seluruh `pub fn`** (module API) wajib memiliki doc comment yang mencakup deskripsi, `# Arguments`, `# Returns`, dan contoh penggunaan (`# Example`) yang dapat diverifikasi `cargo test`.
+- **Seluruh tipe publik** yang muncul di signature `pub fn` wajib didokumentasikan.
+- Doc comment menggunakan bahasa konsisten (nama/istilah teknis boleh Bahasa Indonesia).
+
+### 17.2 Command Verifikasi
+
+```bash
+# Generate rustdoc untuk seluruh workspace
+cargo doc --workspace --no-deps --open
+
+# Pastikan code berkompilasi
+cargo check --workspace
+
+# Pastikan contoh di doc-comment benar
+cargo test --workspace
+```
+
+### 17.3 Status
+
+- Saat ini di seluruh dokumen planning: **Rustdoc planned** — requirements telah ditetapkan per modul (Bagian 17.6/17.5 di masing-masing dokumen modul), dokumen belum diklaim *generated & verified* sampai diimplementasikan.
+- Setelah implementasi, setiap tim menjalankan command di atas dan mencatat bukti (screenshot/URL hasil `cargo doc`).
+
+---
+
+## 18. Rubrik Penilaian & Verifikasi Dosen
+
+Dokumen planning ini ditargetkan agar memenuhi rubrik berikut. Tabel melacak di mana bukti *planning* berada dan apa bukti *implementasi* yang masih perlu dihasilkan.
+
+| Rubrik | Bobot | Bukti di Planning | Bukti Implementasi yang Masih Diperlukan |
+| --- | --- | --- | --- |
+| A. Repositori Github | 15% | Struktur workspace, crate per modul, command build/test/rustdoc (Section 4, 17) | Repositori dibuat, diakses dosen, README diisi |
+| B. Prioritas Modul | 25% | Prioritas fitur & tahapan per modul (Section 6 + bagan timeline Section 10) | Demonstrasi fitur prioritas yang sudah jalan |
+| C. Rustdoc | 20% | Requirement rustdoc per modul (Section 17 + Bagian 17 di tiap planning modul) | `cargo doc` dihasilkan & aksesibel |
+| D. Komunikasi Antar Module (mod & pub fn) | 40% | Batas `mod`/`pub fn`, tabel visibilitas, matriks komunikasi (Section 16 + Bagian 17 di tiap planning modul) | Interface diimplementasikan, pengujian komposisi di api-server |
+
+### 18.1 Checklist Verifikasi
+
+- [ ] Repositori Github dibuat dan link dicantumkan di A.4.
+- [ ] Browser/dosen dapat membuka halaman rustdoc (`cargo doc`).
+- [ ] Setiap modul memiliki minimal satu `pub fn` yang dipanggil dari Axum handler.
+- [ ] Tidak ada dependency crate antar modul (hanya bergantung shared).
+- [ ] Komunikasi antar modul didemonstrasikan minimal satu jalur (mis. hasil `search` sebagai input `compare_species`) dengan mock/integrasi nyata di lapisan aplikasi.
+- [ ] Tidak ada klaim fitur/statistik yang tidak terverifikasi.
+
+---
+
 ## Appendix A: Quick Reference
 
 ### A.1 Key Commands
@@ -1692,6 +1834,9 @@ cargo fmt --workspace
 # Run API server
 cargo run --bin api-server
 
+# Generate rustdoc (lihat Section 17)
+cargo doc --workspace --no-deps --open
+
 # Build for production
 cargo build --release --workspace
 ```
@@ -1711,8 +1856,8 @@ cargo build --release --workspace
 - **Shared Library Owner**: Project Lead
 - **Module 1**: 5-person team
 - **Module 2**: 3-person team
-- **Module 3**: 1-person team
-- **Module 4**: 5-person team
+- **Module 3**: 5-person team
+- **Module 4**: 4-person team
 - **Module 5**: 5-person team
 - **API Server**: Dedicated API team
 - **Frontend**: Django team
@@ -1720,8 +1865,13 @@ cargo build --release --workspace
 ### A.4 Important Links
 
 - **Project Specification**: https://gusti-alfarisy.github.io/blog/2026/pbl-fp-2026/
-- **Repository**: (To be specified)
-- **Documentation**: (To be generated with rustdoc)
+- **Repository**: `<GitHub repository URL>` (placeholder — repositori belum dibuat; isi setelah dibuat, jangan copy-paste URL yang tidak diverifikasi)
+- **Documentation**: (To be generated with rustdoc — lihat Section 17)
+
+Checklist akses dosen:
+- [ ] Link repository dapat dibuka oleh dosen.
+- [ ] Dosen dapat mengakses README dan struktur workspace.
+- [ ] Dosen dapat menjalankan `cargo doc` / membuka rustdoc.
 
 ---
 
@@ -1730,6 +1880,7 @@ cargo build --release --workspace
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 0.1.0 | 2026-09-17 | Project Lead | Initial MASTERPLAN creation |
+| 0.2.0 | 2026-09-18 | Project Lead | Added Section 16 (Komunikasi Antar Modul), Section 17 (Rustdoc), Section 18 (Rubrik Verifikasi); added cross-module `pub fn` communication model |
 
 ---
 

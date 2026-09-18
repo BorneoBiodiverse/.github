@@ -591,6 +591,7 @@ Prinsip yang digunakan:
 * Modul hanya bergantung pada **shared library** (`kalimantanbio-shared`) untuk tipe data, scoring, dan validasi umum.
 * Tidak ada ketergantungan pada implementasi internal Modul 1, 3, 4, atau 5.
 * Konvensi ID dan atribut bersama hanya digunakan melalui interface yang disepakati.
+* Modul hanya mengekspos **interface publik (`pub fn`)** yang dibutuhkan — lihat Bagian 17.
 * Integrasi dengan fitur lain bersifat opsional; contohnya menerima ID hasil pencarian atau membuka detail spesies.
 
 | Komponen | Hubungan dengan Modul 2 |
@@ -630,6 +631,8 @@ Tahap backend Rust–Axum dianggap selesai apabila:
 * [ ] Integrasi pipeline Rust–API Axum dan smoke test backend pada lingkungan target yang disepakati berhasil.
 * [ ] Pengukuran waktu respons pada volume data yang disepakati memenuhi target tim; hasil dan keterbatasannya dicatat.
 * [ ] Dosen dapat menelusuri penerapan functional thinking dari fungsi murni, komposisi pipeline, dan pengujian yang dapat direproduksi.
+* [ ] Interface publik (`pub fn explore_relationships`) didefinisikan jelas dan teruji — lihat Bagian 17.
+* [ ] Seluruh `pub fn` memiliki dokumentasi rustdoc lengkap.
 
 ---
 
@@ -738,4 +741,121 @@ Pengujian integrasi tambahan: kirim permintaan API dengan pusat `sp-a`, lalu per
 12. Dokumentasikan hasil, versi dataset/scoring, cara menjalankan, contoh API, dan demonstrasi penerapan functional programming.
 13. Review kriteria selesai backend bersama tim dan dosen, lalu verifikasi layanan Axum pada lingkungan target sesuai proses proyek.
 14. Pada tahap lanjutan, tentukan teknologi GUI dan susun planning integrasi ke `kalimantanbio.com/repository/` berdasarkan API yang sudah tersedia; keputusan ini tidak menjadi prasyarat penyelesaian backend.
+
+---
+
+## 17. Interface Publik & Komunikasi Antar Modul
+
+Bagian ini menjelaskan batas `mod` dan `pub fn` Modul 2 sebagai bukti pemenuhan aspek **Komunikasi Antar Module** pada rubrik penilaian (40%).
+
+### 17.1 Batas Modul (Owns / Does Not Own / Internal / Public)
+
+| Aspek | Isi |
+| --- | --- |
+| **Owns** | Ekstraksi bukti kesamaan, relationship scoring, discovery/ranking, penjelasan hubungan, dan pembentukan data species network. |
+| **Does Not Own** | Data spesies/taksonomi (shared library), pencarian spesies (M1), hierarki taksonomi mendalam (M3), perbandingan detail (M4), publikasi ilmiah (M5). |
+| **Internal** | `normalize_species`, `prepare_species`, `validate_query`, `validate_weights`, `find_species`, `taxonomy_evidence`, `set_evidence`, `collect_evidence`, `candidate_species`, `explain_relationship`, `score_candidates`, `make_node`, `make_edge`, `build_network`, `assemble_result`. |
+| **Publicly Exposes** | `explore_relationships` (main) dan `calculate_relationship` (pasangan, opsional) — kapabilitas yang dapat digunakan Axum handler maupun modul lain. |
+
+### 17.2 Fungsi Publik (`pub fn`) — Modul 2
+
+| `pub fn` | Provider | Consumer Potensial | Purpose | Input | Output | Why Needed |
+| --- | --- | --- | --- | --- | --- | --- |
+| `explore_relationships` | Modul 2 | Axum handler `/api/v1/species/:id/relationships`; opsional M1 (melanjutkan dari hasil pencarian) | Pipeline utama: validasi → bukti → skor → ranking → network | snapshot `&[Species]`, `&RelationshipQuery`, `&ScoreWeights` | `Result<ExplorerResult, ExplorerError>` | Kapabilitas utama modul untuk aplikasi dan modul lain. |
+| `calculate_relationship` *(skor pasangan)* | Modul 2 | Internal pipeline; opsional kapabilitas publik | Menghitung skor kesamaan dua spesies | dua spesies + bobot | `RelationshipScore` | Memisahkan hitungan inti agar dapat diuji dan digunakan ulang. |
+
+```rust
+/// Menjelajahi hubungan antarspesies dari satu spesies pusat.
+///
+/// # Arguments
+///
+/// * `input` - Snapshot seluruh spesies yang tersedia.
+/// * `query` - ID spesies pusat, ambang skor, limit, dan basis yang diwajibkan.
+/// * `weights` - Bobot scoring yang sudah divalidasi (jumlah = 1.0).
+///
+/// # Returns
+///
+/// Rekomendasi spesies terkait, skor, penjelasan, dan data graf.
+pub fn explore_relationships(
+    input: &[Species],
+    query: &RelationshipQuery,
+    weights: &ScoreWeights,
+) -> Result<ExplorerResult, ExplorerError>
+```
+
+### 17.3 Visibilitas Fungsi
+
+| Fungsi | Visibilitas | Lapisan | Konsumen |
+| --- | --- | --- | --- |
+| `normalize_species`, `prepare_species` | private | Internal helper (module-specific) | Pipeline `explore_relationships` |
+| `validate_query`, `validate_weights`, `find_species` | private | Internal helper (module-specific) | Pipeline |
+| `taxonomy_evidence`, `set_evidence`, `collect_evidence` | private | Internal helper (module-specific) | `calculate_relationship` |
+| `candidate_species`, `explain_relationship`, `score_candidates` | private | Internal helper (module-specific) | Pipeline |
+| `rank_related` | private (membungkus shared `rank_by_score`) | Internal helper | Pipeline |
+| `make_node`, `make_edge`, `build_network`, `assemble_result` | private | Internal helper (module-specific) | Pipeline |
+| `calculate_relationship` | `pub fn` | Module API (opsional) | Internal pipeline; opsional modul lain |
+| `explore_relationships` | `pub fn` | Module API | Axum handler; opsional M1 di aplikasi |
+
+> Aturan: fungsi pembantu tetap **private**. Hanya kapabilitas bermakna yang diekspos sebagai `pub fn`. Axum HTTP handler hidup di crate `api-server`.
+
+### 17.4 Komunikasi Antar Modul (Provider → Receiver)
+
+```text
+Modul 2 (Provider)
+      │
+      │ pub fn explore_relationships(...)
+      ▼
+Axum handler /api/v1/species/:id/relationships  (Receiver / Aplikasi)
+      │  hasil: ExplorerResult (skor, bukti, network)
+      ▼
+Django API → Frontend
+```
+
+Hubungan opsional (interface publik, bukan dependency crate):
+
+```text
+Modul 1 ──spesies pusat──▶ Modul 2 (RECEIVER dari hasil pencarian, opsional)
+Modul 2 ──ExplorerResult──▶ Modul 4 (penerusan ID untuk perbandingan, opsional)
+Modul 2 ──ExplorerResult──▶ Modul 5 (membuka referensi spesies, opsional)
+Modul 3 ──taksonomi──────▶ Modul 2 (membuka info taksonomi, opsional)
+```
+
+| Provider | `pub fn` | Receiver | Purpose | Data yang Dikirim | Priority |
+| --- | --- | --- | --- | --- | --- |
+| Modul 2 | `explore_relationships` | Axum handler | Respons API relasi antarspesies | snapshot + query + weights | **Required** (API) |
+| Modul 1 | `search` | Modul 2 | Menyediakan spesies pusat untuk dieksplor | species (satu) | Optional |
+| Modul 3 | interface taksonomi | Modul 2 | Membuka informasi taksonomi pada relasi | taxonomy info | Optional |
+| Modul 2 | `explore_relationships` | Modul 4 | Penerusan ID spesies untuk perbandingan | species_ids | Optional |
+| Modul 2 | `explore_relationships` | Modul 5 | Membuka referensi spesies melalui interface publik | species_ids | Optional |
+
+> **Selama pengembangan paralel:** Receiver boleh memakai **mock** output dari Modul 1/3. Sebaliknya, Modul 2 tidak bergantung pada implementasi internal modul lain. Setelah integrasi, mock diganti implementasi nyata melalui `pub fn` yang disepakati.
+
+### 17.5 Rustdoc — Modul 2
+
+Rustdoc diwajibkan untuk **seluruh `pub fn`** dan **seluruh tipe publik** modul ini:
+
+* `explore_relationships` — deskripsi, argumen, error, contoh.
+* `calculate_relationship` (jika publik) — formula dan prasyarat bobot.
+* Tipe publik yang muncul di signature `pub fn` (mis. `ExplorerResult`, `RelationshipQuery`, `ScoreWeights`, `RelatedSpecies`, `SpeciesNetwork`).
+
+Command verifikasi:
+
+```bash
+cargo doc --workspace --no-deps --open
+cargo check
+cargo test
+```
+
+Status saat ini di dokumen: **Rustdoc planned** (belum diklaim verified).
+
+---
+
+## 18. Rubrik — Evidence Modul 2
+
+| Rubrik | Evidence di Planning Modul 2 | Bukti Implementasi yang Masih Diperlukan |
+| --- | --- | --- |
+| Repositori Github (15%) | Lokasi `crates/species-relationships` dan command build/test/rustdoc | Repositori dibuat & diakses dosen |
+| Prioritas Modul (25%) | Prioritas fitur: validasi → bukti → skor → discovery → network | Implementasi fitur prioritas |
+| Rustdoc (20%) | Rustdoc diwajibkan untuk semua `pub fn` (Bagian 17.5) | Generate & aksesibel |
+| Komunikasi Antar Module (40%) | Batas `mod`/`pub fn` (17.1–17.2), visibilitas (17.3), matriks komunikasi (17.4) termasuk relasi M1/M3/M4/M5 dari tabel Bagian 13 | Interface diimplementasikan & diuji |
 

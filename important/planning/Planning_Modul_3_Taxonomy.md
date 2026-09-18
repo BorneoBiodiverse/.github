@@ -217,7 +217,7 @@ Membaca data mentah, memvalidasi, dan memetakan ke dalam Domain Model tanpa muta
 | `parse_species` | `fn parse_species(raw: &[RawSpeciesRecord]) -> Result<Species, ParseError>` | **MODULE-SPECIFIC**: Memvalidasi data spesies dan memastikan `genus_id` valid. |
 | `validate_hierarchy` | `fn validate_hierarchy(taxons: &[Taxon]) -> bool` | **MODULE-SPECIFIC**: Pure function untuk mengecek tidak adanya cyclic reference atau orphan node. |
 
-**Person in Charge:** **[Nama Anggota]**
+**Person in Charge:** **Anggota 1 — Data ingestion, parsing, dan validasi hierarki (nama menyusul).**
 
 ---
 
@@ -232,7 +232,7 @@ Membangun struktur pohon (hirarki) menggunakan pendekatan FP (rekursi, folding, 
 | `get_subtree_species` | `fn get_subtree_species(target: &TaxonId, map: &HashMap<TaxonId, Vec<TaxonId>>, species: &[Species]) -> Vec<Species>` | **MODULE-SPECIFIC**: Mengumpulkan semua spesies yang berada di bawah target takson. |
 | `extract_our_genera` | `fn extract_our_genera(taxons: &[Taxon]) -> HashSet<String>` | **MODULE-SPECIFIC**: Mengekstrak semua nama Genus yang ada di database lokal untuk keperluan analisis gap. |
 
-**Person in Charge:** **[Nama Kamu]**
+**Person in Charge:** **Anggota 2 — Konstruksi pohon taksonomi dan traversal (nama menyusul).**
 
 ---
 
@@ -249,7 +249,7 @@ Melakukan agregasi data untuk menghitung statistik dan memfilter spesies endemik
 | `rank_taxon_richness` | `fn rank_taxon_richness(map: &HashMap<TaxonId, Vec<TaxonId>>, species: &[Species]) -> Vec<(Taxon, usize)>` | **Uses SHARED `frequency_distribution`**: Mengurutkan Famili berdasarkan jumlah spesies terbanyak (Species Richness). |
 | `get_subtree_species` | `fn get_subtree_species(target: &TaxonId, map: &HashMap<TaxonId, Vec<TaxonId>>, species: &[Species]) -> Vec<Species>` | **MODULE-SPECIFIC**: Mengumpulkan semua spesies yang berada di bawah target takson. |
 
-**Person in Charge:** **[Nama Kamu]**
+**Person in Charge:** **Anggota 3 — Analisis keanekaragaman dan endemik (nama menyusul).**
 
 ---
 
@@ -266,7 +266,7 @@ Membandingkan data internal dengan referensi eksternal untuk menemukan Taxonomic
 | `extract_our_genera` | `fn extract_our_genera(taxons: &[Taxon]) -> HashSet<String>` | **MODULE-SPECIFIC**: Mengekstrak semua nama Genus yang ada di database lokal. |
 | `generate_gap_report` | `fn generate_gap_report(missing: &[String], score: f64) -> GapReport` | **MODULE-SPECIFIC**: Menyusun hasil analisis gap menjadi struktur laporan. |
 
-**Person in Charge:** **[Nama Kamu]**
+**Person in Charge:** **Anggota 4 — Analisis coverage dan gap (nama menyusul).**
 
 ---
 
@@ -283,7 +283,7 @@ Menggabungkan fungsi-fungsi di atas menjadi entry point dan melakukan End-to-End
 | Unit Tests | `mod tests { ... }` | Menguji `get_lineage`, `find_missing_taxa`, dan `calculate_diversity` dengan dummy data. |
 | Pipeline Validation | `cargo test` | Menjalankan seluruh skenario pengujian secara otomatis. |
 
-**Person in Charge:** **[Nama Kamu]**
+**Person in Charge:** **Anggota 5 — Integrasi pipeline, unit testing, dan dokumentasi (nama menyusul).**
 
 > **Catatan:** Setiap PIC tetap bertanggung jawab terhadap pengujian fungsi yang mereka implementasikan. Jika tahap ini merupakan tahap integrasi, PIC berfokus pada pengujian antar-komponen dan pengujian end-to-end.
 
@@ -397,15 +397,23 @@ Setiap fungsi sebaiknya memiliki satu tanggung jawab yang jelas dan dapat diuji 
 
 ---
 
-## 11. Pembagian Kerja — 1 Anggota
+## 11. Pembagian Kerja — 5 Anggota
+
+| Anggota | Tahap yang Dipegang | Fokus Tanggung Jawab |
+| --- | --- | --- |
+| Anggota 1 | Tahap 1 | Data ingestion, parsing, dan validasi hierarki. |
+| Anggota 2 | Tahap 2 | Konstruksi pohon taksonomi dan traversal. |
+| Anggota 3 | Tahap 3 | Analisis keanekaragaman dan endemik. |
+| Anggota 4 | Tahap 4 | Analisis coverage dan gap. |
+| Anggota 5 | Tahap 5 | Integrasi pipeline, unit testing, dan dokumentasi. |
 
 | # | Tahap | Fungsi / Tanggung Jawab Utama | PIC | Status |
 | --- | --- | --- | --- | --- |
-| 1 | Tahap 1 | `parse_taxons`, `parse_species`, `validate_hierarchy` | [Nama Kamu] | Belum dimulai |
-| 2 | Tahap 2 | `build_taxonomy_map`, `get_lineage`, `get_subtree_species` | [Nama Kamu] | Belum dimulai |
-| 3 | Tahap 3 | `calculate_diversity`, `filter_endemic_taxa`, `rank_taxon_richness` (counting via shared) | [Nama Kamu] | Belum dimulai |
-| 4 | Tahap 4 | `extract_our_genera`, `generate_gap_report` (set ops via shared) | [Nama Kamu] | Belum dimulai |
-| 5 | Tahap 5 | `generate_taxonomy_report` & Unit Testing | [Nama Kamu] | Belum dimulai |
+| 1 | Tahap 1 | `parse_taxons`, `parse_species`, `validate_hierarchy` | Anggota 1 | Belum dimulai |
+| 2 | Tahap 2 | `build_taxonomy_map`, `get_lineage`, `get_subtree_species` | Anggota 2 | Belum dimulai |
+| 3 | Tahap 3 | `calculate_diversity`, `filter_endemic_taxa`, `rank_taxon_richness` (counting via shared) | Anggota 3 | Belum dimulai |
+| 4 | Tahap 4 | `extract_our_genera`, `generate_gap_report` (set ops via shared) | Anggota 4 | Belum dimulai |
+| 5 | Tahap 5 | `generate_taxonomy_report` & Unit Testing | Anggota 5 | Belum dimulai |
 
 > **Catatan:** Fungsi `set_difference`, `calculate_coverage_percentage`, `count_by_key`, dan `frequency_distribution` berasal dari **shared library** (`kalimantanbio-shared`) dan **tidak perlu diimplementasikan** di modul ini. Data diambil dari production database melalui `fetch_all_species` (shared library).
 
@@ -450,7 +458,8 @@ Prinsip yang digunakan:
 * Modul dapat diuji secara mandiri.
 * Modul tidak boleh bergantung pada implementasi internal modul lain.
 * Modul hanya bergantung pada **shared library** (`kalimantanbio-shared`) untuk tipe data dan fungsi umum.
-* Integrasi dengan modul lain bersifat opsional dan dilakukan melalui interface yang telah disepakati.
+* Modul hanya mengekspos **interface publik (`pub fn`)** yang dibutuhkan — lihat Bagian 17.
+* Integrasi dengan modul lain bersifat opsional dan dilakukan melalui interface publik yang telah disepakati, dikomposisikan di lapisan aplikasi (Axum api-server) — bukan sebagai dependency crate.
 * Jangan mengasumsikan dependency terhadap modul lain tanpa kebutuhan teknis yang jelas.
 
 ```text
@@ -480,6 +489,8 @@ Modul dianggap siap untuk tahap akhir apabila:
 * [ ] Pipeline utama dapat berjalan end-to-end.
 * [ ] Input dapat diproses sesuai spesifikasi.
 * [ ] Output menghasilkan format yang telah disepakati.
+* [ ] Interface publik (`pub fn generate_taxonomy_report`) didefinisikan jelas dan teruji — lihat Bagian 17.
+* [ ] Seluruh `pub fn` memiliki dokumentasi rustdoc lengkap.
 * [ ] Tidak terdapat dependency yang tidak diperlukan.
 * [ ] Tidak terdapat state global yang tidak diperlukan.
 * [ ] Dokumentasi fungsi dan struktur data tersedia.
@@ -558,3 +569,108 @@ vec!["Genus C"] (Missing Taxa)
 8. Lakukan pengujian end-to-end (termasuk koneksi production database via shared library).
 9. Dokumentasikan hasil dan contoh penggunaan modul.
 10. Review akhir sebelum modul dianggap selesai.
+
+---
+
+## 17. Interface Publik & Komunikasi Antar Modul
+
+Bagian ini menjelaskan batas `mod` dan `pub fn` Modul 3 sebagai bukti pemenuhan aspek **Komunikasi Antar Module** pada rubrik penilaian (40%).
+
+### 17.1 Batas Modul (Owns / Does Not Own / Internal / Public)
+
+| Aspek | Isi |
+| --- | --- |
+| **Owns** | Ingestion data takson, konstruksi pohon taksonomi, analisis keanekaragaman/endemik, dan analisis cakupan/gap. |
+| **Does Not Own** | Data spesies/taksonomi dasar (shared library), pencarian spesies (M1), relasi antarspesies (M2), perbandingan (M4), publikasi (M5). |
+| **Internal** | `parse_taxons`, `parse_species`, `validate_hierarchy`, `build_taxonomy_map`, `get_lineage`, `get_subtree_species`, `extract_our_genera`, `filter_endemic_taxa`, `rank_taxon_richness`, `generate_gap_report`. |
+| **Publicly Exposes** | `generate_taxonomy_report` (main), `calculate_diversity` (keanekaragaman), dan `analyze_taxonomic_gap` (gap) — kapabilitas yang dapat digunakan Axum handler maupun modul lain. |
+
+### 17.2 Fungsi Publik (`pub fn`) — Modul 3
+
+| `pub fn` | Provider | Consumer Potensial | Purpose | Input | Output | Why Needed |
+| --- | --- | --- | --- | --- | --- | --- |
+| `generate_taxonomy_report` | Modul 3 | Axum handler `/api/v1/taxonomy/*` | Entry point pipeline Tahap 1–4 | `&BioDataInput` | `Result<ExplorationReport, PipelineError>` | Kapabilitas utama modul untuk aplikasi. |
+| `calculate_diversity` *(sudah `pub` di contoh)* | Modul 3 | Axum handler; opsional M2/M4 (statistik keanekaragaman) | Menghitung statistik keanekaragaman | `&[Species]` | `DiversityStats` | Statistik ringkas yang dapat dipakai modul lain. |
+| `analyze_taxonomic_gap` *(sudah `pub` di contoh)* | Modul 3 | Axum handler `/api/v1/taxonomy/gaps`; opsional M5 (isi penelitian) | Membandingkan genus lokal vs referensi | `&HashSet<String>` × 2 | `GapReport` | Analisis gap yang bernilai ilmiah untuk proyek. |
+
+```rust
+/// Menghasilkan laporan taksonomi lengkap (pohon, keanekaragaman, endemik, gap).
+///
+/// # Arguments
+///
+/// * `input` - Data takson mentah, data spesies mentah, dan genus referensi.
+///
+/// # Returns
+///
+/// Laporan berisi daftar genus endemik, ranking richness, taxa hilang, dan skor cakupan.
+pub fn generate_taxonomy_report(input: &BioDataInput) -> Result<ExplorationReport, PipelineError>
+```
+
+### 17.3 Visibilitas Fungsi
+
+| Fungsi | Visibilitas | Lapisan | Konsumen |
+| --- | --- | --- | --- |
+| `parse_taxons`, `parse_species`, `validate_hierarchy` | private | Internal helper (module-specific) | Pipeline |
+| `build_taxonomy_map`, `get_lineage`, `get_subtree_species` | private | Internal helper (module-specific) | Pipeline |
+| `extract_our_genera`, `filter_endemic_taxa`, `rank_taxon_richness` | private | Internal helper (module-specific) | Pipeline |
+| `generate_gap_report` | private | Internal helper (module-specific) | `analyze_taxonomic_gap` |
+| `generate_taxonomy_report` | `pub fn` | Module API | Axum handler; opsional modul lain |
+| `calculate_diversity` | `pub fn` | Module API | Axum handler; opsional M2/M4 |
+| `analyze_taxonomic_gap` | `pub fn` | Module API | Axum handler; opsional M5 |
+
+### 17.4 Komunikasi Antar Modul (Provider → Receiver)
+
+```text
+Modul 3 (Provider)
+      │
+      │ pub fn generate_taxonomy_report(...)
+      ▼
+Axum handler /api/v1/taxonomy/*  (Receiver / Aplikasi)
+      │  hasil: ExplorationReport
+      ▼
+Django API → Frontend
+```
+
+Hubungan opsional (interface publik, bukan dependency crate):
+
+```text
+Modul 3 ──DiversityStats────▶ Modul 2 (konteks keanekaragaman, opsional)
+Modul 3 ──DiversityStats────▶ Modul 4 (konteks perbandingan, opsional)
+Modul 3 ──GapReport─────────▶ Modul 5 (spesies understudied, opsional)
+```
+
+| Provider | `pub fn` | Receiver | Purpose | Data yang Dikirim | Priority |
+| --- | --- | --- | --- | --- | --- |
+| Modul 3 | `generate_taxonomy_report` | Axum handler | Respons API taksonomi | `BioDataInput` | **Required** (API) |
+| Modul 3 | `calculate_diversity` | Modul 2/4 | Statistik keanekaragaman sebagai konteks | `DiversityStats` | Optional |
+| Modul 3 | `analyze_taxonomic_gap` | Modul 5 | Spesies yang kurang terwakili untuk prioritas riset | `GapReport` | Optional |
+
+> **Selama pengembangan paralel:** Receiver boleh memakai **mock** output Modul 3. Modul 3 tidak pernah bergantung pada fungsi modul lain selain shared library.
+
+### 17.5 Rustdoc — Modul 3
+
+Rustdoc diwajibkan untuk **seluruh `pub fn`** dan **seluruh tipe publik** modul ini:
+
+* `generate_taxonomy_report`, `calculate_diversity`, `analyze_taxonomic_gap`.
+* Tipe publik yang muncul di signature `pub fn` (mis. `BioDataInput`, `ExplorationReport`, `DiversityStats`, `GapReport`, `Taxon`, `RawTaxonRecord`).
+
+Command verifikasi:
+
+```bash
+cargo doc --workspace --no-deps --open
+cargo check
+cargo test
+```
+
+Status saat ini di dokumen: **Rustdoc planned** (belum diklaim verified).
+
+---
+
+## 18. Rubrik — Evidence Modul 3
+
+| Rubrik | Evidence di Planning Modul 3 | Bukti Implementasi yang Masih Diperlukan |
+| --- | --- | --- |
+| Repositori Github (15%) | Lokasi `crates/taxonomy` dan command build/test/rustdoc | Repositori dibuat & diakses dosen |
+| Prioritas Modul (25%) | Prioritas fitur: parsing → tree → diversity/endemic → coverage/gap | Implementasi fitur prioritas |
+| Rustdoc (20%) | Rustdoc diwajibkan untuk semua `pub fn` (Bagian 17.5) | Generate & aksesibel |
+| Komunikasi Antar Module (40%) | Batas `mod`/`pub fn` (17.1–17.2), visibilitas (17.3), matriks komunikasi (17.4) | Interface diimplementasikan & diuji |

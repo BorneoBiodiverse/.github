@@ -349,8 +349,9 @@ Prinsip yang digunakan:
 * Modul dapat dikembangkan secara mandiri.
 * Modul dapat diuji secara mandiri.
 * Modul tidak boleh bergantung pada implementasi internal modul lain.
+* Modul hanya mengekspos **interface publik (`pub fn`)** yang dibutuhkan — lihat Bagian 17.
 * Gunakan shared concepts atau data conventions hanya ketika diperlukan.
-* Integrasi dengan modul lain bersifat opsional dan dilakukan melalui interface yang telah disepakati.
+* Integrasi dengan modul lain bersifat opsional dan dilakukan melalui interface publik yang telah disepakati, dikomposisikan di lapisan aplikasi (Axum api-server) — bukan sebagai dependency crate.
 * Jangan mengasumsikan dependency terhadap modul lain tanpa kebutuhan teknis yang jelas.
 
 ```text
@@ -384,6 +385,8 @@ Modul dianggap siap untuk tahap akhir apabila:
 * [ ] Tidak terdapat dependency yang tidak diperlukan.
 * [ ] Tidak terdapat state global yang tidak diperlukan.
 * [ ] Dokumentasi fungsi dan struktur data tersedia.
+* [ ] Interface publik (`pub fn`) didefinisikan jelas dan teruji — lihat Bagian 17.
+* [ ] Seluruh `pub fn` memiliki dokumentasi rustdoc lengkap.
 * [ ] Terdapat demonstrasi penggunaan modul.
 * [ ] Modul dapat dijalankan secara independen.
 
@@ -459,4 +462,77 @@ Modul dianggap siap untuk tahap akhir apabila:
 10. Gabungkan seluruh tahap ke dalam pipeline utama.
 11. Lakukan pengujian end-to-end.
 12. Dokumentasikan hasil dan contoh penggunaan modul.
-13. Review akhir sebelum modul dianggap selesai.
+13. Review akhir sebelum modul dianggap selesai, termasuk kelengkapan rustdoc pada seluruh `pub fn`.
+
+---
+
+## 17. Interface Publik & Komunikasi Antar Modul
+
+Bagian ini menjelaskan batas `mod` dan `pub fn` modul sebagai bukti pemenuhan aspek **Komunikasi Antar Module** pada rubrik penilaian (40%).
+
+### 17.1 Batas Modul (Owns / Does Not Own / Internal / Public)
+
+| Aspek | Isi |
+| --- | --- |
+| **Owns** | [Hal-hal yang menjadi kepemilikan modul ini] |
+| **Does Not Own** | [Hal-hal yang bukan kepemilikan modul ini] |
+| **Internal** | [Daftar fungsi helper yang tetap private] |
+| **Publicly Exposes** | [Daftar `pub fn` yang diekspos sebagai module API] |
+
+### 17.2 Fungsi Publik (`pub fn`)
+
+| `pub fn` | Provider | Consumer Potensial | Purpose | Input | Output | Why Needed |
+| --- | --- | --- | --- | --- | --- | --- |
+| [nama] | Modul [N] | Axum handler; opsional modul lain | [Tujuan] | [input] | [output] | [Mengapa dibutuhkan] |
+
+### 17.3 Visibilitas Fungsi
+
+| Fungsi | Visibilitas | Lapisan | Konsumen |
+| --- | --- | --- | --- |
+| [fungsi helper] | private | Internal helper | Pipeline |
+| [pub fn] | `pub fn` | Module API | Axum handler; opsional modul lain |
+
+> Aturan: fungsi pembantu (helper) tetap **private**. Hanya kapabilitas bermakna yang diekspos sebagai `pub fn`. Axum HTTP handler hidup di crate `api-server`, bukan di crate modul.
+
+### 17.4 Komunikasi Antar Modul (Provider → Receiver)
+
+```text
+Modul [N] (Provider)
+      │
+      │ pub fn [nama]...
+      ▼
+Axum handler /api/v1/...  (Receiver / Aplikasi)
+      │  hasil: [Output]
+      ▼
+Django API → Frontend
+```
+
+| Provider | `pub fn` | Receiver | Purpose | Data yang Dikirim | Priority |
+| --- | --- | --- | --- | --- | --- |
+| Modul [N] | [pub fn] | Axum handler | [Tujuan] | [data] | **Required** |
+| Modul [X] | [pub fn] | Modul [N] (opsional) | [Tujuan] | [data] | Optional |
+
+> **Selama pengembangan paralel:** Receiver boleh memakai **mock** output provider; setelah integrasi, mock diganti implementasi nyata melalui `pub fn` yang sama. Prinsip lengkap ada di [MASTERPLAN.md](../MASTERPLAN.md) Section 16.
+
+### 17.5 Rustdoc
+
+Rustdoc diwajibkan untuk **seluruh `pub fn`** dan **seluruh tipe publik** modul ini.
+
+```bash
+cargo doc --workspace --no-deps --open
+cargo check
+cargo test
+```
+
+Status saat ini di dokumen: **Rustdoc planned** (belum diklaim verified).
+
+---
+
+## 18. Rubrik — Evidence Modul [N]
+
+| Rubrik | Evidence di Planning Modul [N] | Bukti Implementasi yang Masih Diperlukan |
+| --- | --- | --- |
+| Repositori Github (15%) | Lokasi `crates/[nama-crate]` dan command build/test/rustdoc | Repositori dibuat & diakses dosen |
+| Prioritas Modul (25%) | Prioritas fitur pada tahapan modul | Implementasi fitur prioritas |
+| Rustdoc (20%) | Rustdoc diwajibkan untuk semua `pub fn` (Bagian 17.5) | Generate & aksesibel |
+| Komunikasi Antar Module (40%) | Batas `mod`/`pub fn` (17.1–17.2), visibilitas (17.3), matriks komunikasi (17.4) | Interface diimplementasikan & diuji |
